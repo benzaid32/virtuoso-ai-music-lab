@@ -7,6 +7,7 @@ import { Instrument, Group, Mode } from '../pages/Index';
 
 export const useMusicGeneration = () => {
   const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState('');
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -26,9 +27,11 @@ export const useMusicGeneration = () => {
     }
 
     setGenerating(true);
+    setProgress('Preparing music generation...');
 
     try {
       // Create project record
+      setProgress('Creating project...');
       const { data: project, error: projectError } = await supabase
         .from('music_projects')
         .insert({
@@ -51,6 +54,9 @@ export const useMusicGeneration = () => {
 
       if (projectError) throw projectError;
 
+      setProgress('Generating music with AI...');
+      console.log('Calling music generation function...');
+
       // Call music generation edge function
       const { data, error } = await supabase.functions.invoke('generate-music', {
         body: {
@@ -62,26 +68,51 @@ export const useMusicGeneration = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Function invocation error:', error);
+        throw new Error(error.message || 'Music generation failed');
+      }
 
+      console.log('Generation response:', data);
+
+      if (!data.success) {
+        throw new Error(data.error || 'Music generation failed');
+      }
+
+      setProgress('Music generation completed!');
+      
       toast({
         title: "Success",
-        description: "Music generation started successfully!",
+        description: "Your AI-generated music is ready!",
       });
 
-      return data;
+      return {
+        projectId: data.projectId,
+        outputAudioId: data.outputAudioId,
+        audioUrl: data.audioUrl
+      };
     } catch (error: any) {
       console.error('Generation error:', error);
+      
+      // Update project status to failed
+      if (project?.id) {
+        await supabase
+          .from('music_projects')
+          .update({ status: 'failed' })
+          .eq('id', project.id);
+      }
+
       toast({
         title: "Generation failed",
-        description: error.message,
+        description: error.message || 'An error occurred during music generation',
         variant: "destructive",
       });
       return null;
     } finally {
       setGenerating(false);
+      setProgress('');
     }
   };
 
-  return { generateMusic, generating };
+  return { generateMusic, generating, progress };
 };

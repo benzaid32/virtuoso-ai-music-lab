@@ -8,25 +8,32 @@ interface ProcessingScreenProps {
   selectedInstrument: Instrument;
   selectedGroup: Group;
   importedFile: any;
+  generating?: boolean;
+  progress?: string;
 }
 
 const ProcessingScreen: React.FC<ProcessingScreenProps> = ({
   selectedMode,
   selectedInstrument,
   selectedGroup,
-  importedFile
+  importedFile,
+  generating = false,
+  progress = ''
 }) => {
   return (
     <div className="space-y-6 text-center">
       <div>
         <h2 className="text-2xl font-bold text-yellow-400 mb-2">AI Processing</h2>
         <p className="text-gray-400">Creating your {selectedMode} arrangement...</p>
+        {progress && (
+          <p className="text-sm text-blue-400 mt-2">{progress}</p>
+        )}
       </div>
 
       {/* Processing Animation */}
       <div className="relative">
         <div className="w-32 h-32 mx-auto mb-6 relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-blue-400 rounded-full animate-spin">
+          <div className={`absolute inset-0 bg-gradient-to-r from-yellow-400 to-blue-400 rounded-full ${generating ? 'animate-spin' : ''}`}>
             <div className="absolute inset-2 bg-gray-900 rounded-full flex items-center justify-center">
               <Wand2 className="w-8 h-8 text-yellow-400" />
             </div>
@@ -34,8 +41,10 @@ const ProcessingScreen: React.FC<ProcessingScreenProps> = ({
         </div>
         
         <div className="flex justify-center items-center space-x-2 mb-6">
-          <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
-          <span className="text-white">Analyzing audio patterns...</span>
+          {generating && <Loader2 className="w-5 h-5 animate-spin text-blue-400" />}
+          <span className="text-white">
+            {generating ? (progress || 'Generating music with AI...') : 'Processing complete!'}
+          </span>
         </div>
       </div>
 

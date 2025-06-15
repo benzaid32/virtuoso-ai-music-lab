@@ -10,6 +10,7 @@ import ExportScreen from '../components/ExportScreen';
 import AudioControls from '../components/AudioControls';
 import { Button } from '@/components/ui/button';
 import { LogOut, User } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export type Instrument = 'saxophone' | 'harmonica' | 'steelpan' | 'electric-guitar';
 export type Group = 'orchestra' | 'soul-band';
@@ -25,7 +26,7 @@ export interface AudioFile {
 const Index = () => {
   const { user, loading, signOut } = useAuth();
   const { uploadAudioFile, uploading } = useAudioUpload();
-  const { generateMusic, generating } = useMusicGeneration();
+  const { generateMusic, generating, progress } = useMusicGeneration();
   
   const [currentScreen, setCurrentScreen] = useState<'import' | 'processing' | 'export'>('import');
   const [selectedMode, setSelectedMode] = useState<Mode>('solo');
@@ -38,6 +39,7 @@ const Index = () => {
   const [duration, setDuration] = useState(0);
 
   const handleFileImport = async (file: File) => {
+    console.log('Importing file:', file.name);
     const uploadedFile = await uploadAudioFile(file);
     if (uploadedFile) {
       setImportedFile(uploadedFile);
@@ -52,15 +54,34 @@ const Index = () => {
       );
       
       if (result) {
-        // Simulate completed generation for demo
-        setTimeout(() => {
+        console.log('Generation result:', result);
+        
+        // Fetch the generated audio file details
+        const { data: audioFile, error } = await supabase
+          .from('audio_files')
+          .select('*')
+          .eq('id', result.outputAudioId)
+          .single();
+
+        if (!error && audioFile) {
+          console.log('Generated audio file:', audioFile);
+          
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('audio-files')
+            .getPublicUrl(audioFile.file_path);
+
           setGeneratedFile({
-            name: `Generated_${selectedMode}_${selectedInstrument || selectedGroup}.wav`,
-            url: '#',
-            waveform: Array.from({ length: 100 }, () => Math.random())
+            id: audioFile.id,
+            name: audioFile.original_filename,
+            url: publicUrl,
+            waveform: audioFile.waveform_data || []
           });
+          
           setCurrentScreen('export');
-        }, 3000);
+        } else {
+          console.error('Failed to fetch generated audio file:', error);
+        }
       }
     }
   };
@@ -142,6 +163,8 @@ const Index = () => {
                 selectedInstrument={selectedInstrument}
                 selectedGroup={selectedGroup}
                 importedFile={importedFile}
+                generating={generating}
+                progress={progress}
               />
             )}
             {currentScreen === 'export' && (

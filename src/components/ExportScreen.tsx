@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Download, RotateCcw } from 'lucide-react';
+import { Download, RotateCcw, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Waveform from './Waveform';
 
@@ -13,19 +13,50 @@ const ExportScreen: React.FC<ExportScreenProps> = ({
   generatedFile,
   onBackToImport
 }) => {
+  const [isPlaying, setIsPlaying] = React.useState(false);
+  const audioRef = React.useRef<HTMLAudioElement>(null);
+
   const handleDownload = () => {
-    // In a real app, this would trigger the actual download
-    console.log('Downloading:', generatedFile?.name);
-    
-    // Create a mock download
-    const element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,Mock Audio File');
-    element.setAttribute('download', generatedFile?.name || 'generated-audio.wav');
-    element.style.display = 'none';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    if (generatedFile?.url) {
+      console.log('Downloading file:', generatedFile.name);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = generatedFile.url;
+      link.download = generatedFile.name || 'generated-music.wav';
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
+
+  const togglePlayback = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  React.useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      const handleEnded = () => setIsPlaying(false);
+      const handlePause = () => setIsPlaying(false);
+      
+      audio.addEventListener('ended', handleEnded);
+      audio.addEventListener('pause', handlePause);
+      
+      return () => {
+        audio.removeEventListener('ended', handleEnded);
+        audio.removeEventListener('pause', handlePause);
+      };
+    }
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -49,10 +80,33 @@ const ExportScreen: React.FC<ExportScreenProps> = ({
           <h3 className="text-white font-semibold mb-2">Generated File:</h3>
           <p className="text-gray-400 mb-4">{generatedFile.name}</p>
           
-          {/* Waveform Display */}
-          <div className="mb-4">
-            <Waveform waveformData={generatedFile.waveform || []} />
+          {/* Audio Player */}
+          <div className="mb-4 flex items-center justify-center space-x-4">
+            <Button
+              onClick={togglePlayback}
+              variant="outline"
+              size="sm"
+              className="border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white"
+            >
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              {isPlaying ? 'Pause' : 'Play Preview'}
+            </Button>
+            
+            <audio 
+              ref={audioRef} 
+              src={generatedFile.url}
+              preload="metadata"
+              onLoadedData={() => console.log('Audio loaded')}
+              onError={(e) => console.error('Audio error:', e)}
+            />
           </div>
+          
+          {/* Waveform Display */}
+          {generatedFile.waveform && generatedFile.waveform.length > 0 && (
+            <div className="mb-4">
+              <Waveform waveformData={generatedFile.waveform} />
+            </div>
+          )}
         </div>
       )}
 
@@ -61,6 +115,7 @@ const ExportScreen: React.FC<ExportScreenProps> = ({
         <Button
           onClick={handleDownload}
           className="flex-1 bg-green-600 hover:bg-green-700 text-white h-12"
+          disabled={!generatedFile?.url}
         >
           <Download className="mr-2 h-5 w-5" />
           Download Audio
@@ -89,12 +144,12 @@ const ExportScreen: React.FC<ExportScreenProps> = ({
             <span className="text-white ml-2">44.1kHz</span>
           </div>
           <div>
-            <span className="text-gray-400">Duration:</span>
-            <span className="text-white ml-2">~3:45</span>
+            <span className="text-gray-400">AI Model:</span>
+            <span className="text-white ml-2">MusicGen Large</span>
           </div>
           <div>
-            <span className="text-gray-400">Size:</span>
-            <span className="text-white ml-2">8.2 MB</span>
+            <span className="text-gray-400">Duration:</span>
+            <span className="text-white ml-2">~30s</span>
           </div>
         </div>
       </div>

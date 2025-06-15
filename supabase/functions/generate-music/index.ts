@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import Replicate from "https://esm.sh/replicate@0.25.2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,6 +20,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const replicateApiKey = Deno.env.get('REPLICATE_API_KEY');
+    if (!replicateApiKey) {
+      throw new Error('REPLICATE_API_KEY is not configured');
+    }
+
+    const replicate = new Replicate({
+      auth: replicateApiKey,
+    });
+
     const { projectId, mode, instrument, group, inputAudioId } = await req.json();
 
     console.log('Starting music generation for project:', projectId);
@@ -34,22 +44,96 @@ serve(async (req) => {
       throw new Error(`Failed to get input audio: ${audioError.message}`);
     }
 
-    // Simulate AI processing (replace with actual AI service integration)
-    console.log('Processing audio with settings:', { mode, instrument, group });
-    
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Get the public URL for the input audio
+    const { data: { publicUrl: inputAudioUrl } } = supabase.storage
+      .from('audio-files')
+      .getPublicUrl(inputAudio.file_path);
 
-    // Create mock generated audio file
+    console.log('Input audio URL:', inputAudioUrl);
+
+    // Create music generation prompt based on mode and selection
+    let prompt = '';
+    if (mode === 'solo') {
+      const instrumentPrompts = {
+        'saxophone': 'smooth jazz saxophone solo, melodic and soulful',
+        'harmonica': 'bluesy harmonica melody, expressive and emotional',
+        'steelpan': 'caribbean steelpan rhythm, tropical and upbeat',
+        'electric-guitar': 'electric guitar riffs, energetic rock style'
+      };
+      prompt = instrumentPrompts[instrument] || 'melodic instrumental solo';
+    } else {
+      const groupPrompts = {
+        'orchestra': 'full orchestra arrangement, classical and rich harmonies',
+        'soul-band': '1960s soul band, groovy rhythm section with horns'
+      };
+      prompt = groupPrompts[group] || 'full band arrangement';
+    }
+
+    console.log('Generated prompt:', prompt);
+
+    // Run MusicGen model
+    console.log('Calling Replicate MusicGen...');
+    const output = await replicate.run(
+      "meta/musicgen-large",
+      {
+        input: {
+          model_version: "large",
+          prompt: prompt,
+          duration: 30,
+          continuation: true,
+          continuation_start: 0,
+          continuation_end: 15,
+          normalization_strategy: "loudness",
+          top_k: 250,
+          top_p: 0.0,
+          temperature: 1.0,
+          classifier_free_guidance: 3.0,
+          output_format: "wav",
+          seed: -1
+        }
+      }
+    );
+
+    console.log('MusicGen output:', output);
+
+    if (!output) {
+      throw new Error('No output received from MusicGen');
+    }
+
+    // The output is a URL to the generated audio file
+    const generatedAudioUrl = Array.isArray(output) ? output[0] : output;
+    console.log('Generated audio URL:', generatedAudioUrl);
+
+    // Download the generated audio
+    const audioResponse = await fetch(generatedAudioUrl);
+    if (!audioResponse.ok) {
+      throw new Error('Failed to download generated audio');
+    }
+
+    const audioBlob = await audioResponse.blob();
+    const audioBuffer = await audioBlob.arrayBuffer();
+
+    // Upload the generated audio to Supabase Storage
     const generatedFileName = `generated_${mode}_${instrument || group}_${Date.now()}.wav`;
     const generatedFilePath = `${inputAudio.user_id}/${generatedFileName}`;
 
-    // In a real implementation, you would:
-    // 1. Download the input audio from storage
-    // 2. Process it through your AI model
-    // 3. Upload the generated audio back to storage
-    // For now, we'll create a placeholder record
+    const { error: uploadError } = await supabase.storage
+      .from('audio-files')
+      .upload(generatedFilePath, audioBuffer, {
+        contentType: 'audio/wav',
+        upsert: false
+      });
 
+    if (uploadError) {
+      throw new Error(`Failed to upload generated audio: ${uploadError.message}`);
+    }
+
+    // Get public URL for the generated file
+    const { data: { publicUrl: generatedPublicUrl } } = supabase.storage
+      .from('audio-files')
+      .getPublicUrl(generatedFilePath);
+
+    // Create database record for generated audio
     const { data: generatedAudio, error: generatedError } = await supabase
       .from('audio_files')
       .insert({
@@ -57,10 +141,10 @@ serve(async (req) => {
         filename: generatedFileName,
         original_filename: `Generated ${mode} - ${instrument || group}.wav`,
         file_path: generatedFilePath,
-        file_size: inputAudio.file_size || 1000000, // Mock size
+        file_size: audioBuffer.byteLength,
         mime_type: 'audio/wav',
         file_type: 'generated',
-        waveform_data: Array.from({ length: 100 }, () => Math.random())
+        waveform_data: [] // Will be generated later if needed
       })
       .select()
       .single();
@@ -90,6 +174,7 @@ serve(async (req) => {
         success: true,
         projectId,
         outputAudioId: generatedAudio.id,
+        audioUrl: generatedPublicUrl,
         message: 'Music generation completed successfully'
       }),
       {
