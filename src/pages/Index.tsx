@@ -7,7 +7,6 @@ import AuthForm from '../components/AuthForm';
 import ImportScreen from '../components/ImportScreen';
 import ProcessingScreen from '../components/ProcessingScreen';
 import ExportScreen from '../components/ExportScreen';
-import AudioControls from '../components/AudioControls';
 import { Button } from '@/components/ui/button';
 import { LogOut, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,9 +33,6 @@ const Index = () => {
   const [selectedGroup, setSelectedGroup] = useState<Group>('orchestra');
   const [importedFile, setImportedFile] = useState<AudioFile | null>(null);
   const [generatedFile, setGeneratedFile] = useState<AudioFile | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
 
   const handleFileImport = async (file: File) => {
     console.log('Importing file:', file.name);
@@ -98,9 +94,6 @@ const Index = () => {
     setCurrentScreen('import');
     setImportedFile(null);
     setGeneratedFile(null);
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
   };
 
   const handleSignOut = async () => {
@@ -153,7 +146,7 @@ const Index = () => {
         </div>
 
         {/* Main Content Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Top Screen - Import or Processing */}
           <div className="audio-panel rounded-3xl p-8 min-h-[400px] glow-gold">
             {currentScreen === 'import' && (
@@ -199,17 +192,6 @@ const Index = () => {
             </div>
           </div>
         </div>
-
-        {/* Audio Controls */}
-        <AudioControls
-          isPlaying={isPlaying}
-          setIsPlaying={setIsPlaying}
-          currentTime={currentTime}
-          duration={duration}
-          audioUrl={generatedFile?.url}
-          onTimeUpdate={setCurrentTime}
-          onDurationChange={setDuration}
-        />
       </div>
     </div>
   );
