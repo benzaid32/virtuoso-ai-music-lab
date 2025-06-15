@@ -9,7 +9,135 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      audio_files: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          file_path: string
+          file_size: number | null
+          file_type: string
+          filename: string
+          id: string
+          mime_type: string | null
+          original_filename: string
+          user_id: string
+          waveform_data: Json | null
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          file_path: string
+          file_size?: number | null
+          file_type: string
+          filename: string
+          id?: string
+          mime_type?: string | null
+          original_filename: string
+          user_id: string
+          waveform_data?: Json | null
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          file_path?: string
+          file_size?: number | null
+          file_type?: string
+          filename?: string
+          id?: string
+          mime_type?: string | null
+          original_filename?: string
+          user_id?: string
+          waveform_data?: Json | null
+        }
+        Relationships: []
+      }
+      music_projects: {
+        Row: {
+          created_at: string
+          generation_settings: Json | null
+          group_type: string | null
+          id: string
+          input_audio_id: string | null
+          instrument: string | null
+          mode: string
+          name: string
+          output_audio_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          generation_settings?: Json | null
+          group_type?: string | null
+          id?: string
+          input_audio_id?: string | null
+          instrument?: string | null
+          mode: string
+          name: string
+          output_audio_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          generation_settings?: Json | null
+          group_type?: string | null
+          id?: string
+          input_audio_id?: string | null
+          instrument?: string | null
+          mode?: string
+          name?: string
+          output_audio_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "music_projects_input_audio_id_fkey"
+            columns: ["input_audio_id"]
+            isOneToOne: false
+            referencedRelation: "audio_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "music_projects_output_audio_id_fkey"
+            columns: ["output_audio_id"]
+            isOneToOne: false
+            referencedRelation: "audio_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

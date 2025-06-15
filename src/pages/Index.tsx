@@ -1,21 +1,32 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { useAudioUpload } from '../hooks/useAudioUpload';
+import { useMusicGeneration } from '../hooks/useMusicGeneration';
+import AuthForm from '../components/AuthForm';
 import ImportScreen from '../components/ImportScreen';
 import ProcessingScreen from '../components/ProcessingScreen';
 import ExportScreen from '../components/ExportScreen';
 import AudioControls from '../components/AudioControls';
+import { Button } from '@/components/ui/button';
+import { LogOut, User } from 'lucide-react';
 
 export type Instrument = 'saxophone' | 'harmonica' | 'steelpan' | 'electric-guitar';
 export type Group = 'orchestra' | 'soul-band';
 export type Mode = 'solo' | 'group';
 
 export interface AudioFile {
+  id?: string;
   name: string;
   url: string;
   waveform: number[];
 }
 
 const Index = () => {
+  const { user, loading, signOut } = useAuth();
+  const { uploadAudioFile, uploading } = useAudioUpload();
+  const { generateMusic, generating } = useMusicGeneration();
+  
   const [currentScreen, setCurrentScreen] = useState<'import' | 'processing' | 'export'>('import');
   const [selectedMode, setSelectedMode] = useState<Mode>('solo');
   const [selectedInstrument, setSelectedInstrument] = useState<Instrument>('saxophone');
@@ -26,19 +37,32 @@ const Index = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  const handleFileImport = (file: AudioFile) => {
-    setImportedFile(file);
-    setCurrentScreen('processing');
-    
-    // Simulate AI processing
-    setTimeout(() => {
-      setGeneratedFile({
-        name: `Generated_${selectedMode}_${selectedInstrument || selectedGroup}.wav`,
-        url: '#',
-        waveform: Array.from({ length: 100 }, () => Math.random())
-      });
-      setCurrentScreen('export');
-    }, 3000);
+  const handleFileImport = async (file: File) => {
+    const uploadedFile = await uploadAudioFile(file);
+    if (uploadedFile) {
+      setImportedFile(uploadedFile);
+      setCurrentScreen('processing');
+      
+      // Start music generation
+      const result = await generateMusic(
+        selectedMode,
+        selectedMode === 'solo' ? selectedInstrument : null,
+        selectedMode === 'group' ? selectedGroup : null,
+        uploadedFile.id!
+      );
+      
+      if (result) {
+        // Simulate completed generation for demo
+        setTimeout(() => {
+          setGeneratedFile({
+            name: `Generated_${selectedMode}_${selectedInstrument || selectedGroup}.wav`,
+            url: '#',
+            waveform: Array.from({ length: 100 }, () => Math.random())
+          });
+          setCurrentScreen('export');
+        }, 3000);
+      }
+    }
   };
 
   const handleBackToImport = () => {
@@ -47,6 +71,22 @@ const Index = () => {
     setGeneratedFile(null);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-studio-dark via-studio-medium to-studio-dark flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthForm onSuccess={() => {}} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-studio-dark via-studio-medium to-studio-dark text-warm-white relative overflow-hidden">
       {/* Background ambient elements */}
@@ -54,12 +94,30 @@ const Index = () => {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(255,193,7,0.05),transparent_70%)]" />
       
       <div className="relative z-10 container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-400 bg-clip-text text-transparent mb-2">
-            Virtuoso.ai
-          </h1>
-          <p className="text-xl text-gray-300">AI-Powered Music Generator</p>
+        {/* Header with user info */}
+        <div className="flex justify-between items-center mb-8">
+          <div className="text-center flex-1">
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-400 bg-clip-text text-transparent mb-2">
+              Virtuoso.ai
+            </h1>
+            <p className="text-xl text-gray-300">AI-Powered Music Generator</p>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 text-gray-300">
+              <User className="w-5 h-5" />
+              <span>{user.email}</span>
+            </div>
+            <Button 
+              onClick={handleSignOut}
+              variant="outline"
+              size="sm"
+              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
         </div>
 
         {/* Main Content Area */}
@@ -75,6 +133,7 @@ const Index = () => {
                 selectedGroup={selectedGroup}
                 setSelectedGroup={setSelectedGroup}
                 onFileImport={handleFileImport}
+                uploading={uploading}
               />
             )}
             {currentScreen === 'processing' && (
