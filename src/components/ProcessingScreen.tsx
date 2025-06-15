@@ -1,11 +1,12 @@
 
 import React from 'react';
 import { Loader2, Wand2 } from 'lucide-react';
+import { Instrument, Group, Mode } from '../pages/Index';
 
 interface ProcessingScreenProps {
-  selectedMode: 'solo' | 'group';
-  selectedInstrument: string;
-  selectedGroup: string;
+  selectedMode: Mode;
+  selectedInstrument: Instrument;
+  selectedGroup: Group;
   importedFile: any;
 }
 

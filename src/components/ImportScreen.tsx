@@ -3,27 +3,28 @@ import React, { useCallback } from 'react';
 import { Upload, Music, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Instrument, Group, Mode } from '../pages/Index';
 
 interface ImportScreenProps {
-  selectedMode: 'solo' | 'group';
-  setSelectedMode: (mode: 'solo' | 'group') => void;
-  selectedInstrument: string;
-  setSelectedInstrument: (instrument: string) => void;
-  selectedGroup: string;
-  setSelectedGroup: (group: string) => void;
+  selectedMode: Mode;
+  setSelectedMode: (mode: Mode) => void;
+  selectedInstrument: Instrument;
+  setSelectedInstrument: (instrument: Instrument) => void;
+  selectedGroup: Group;
+  setSelectedGroup: (group: Group) => void;
   onFileImport: (file: any) => void;
 }
 
 const soloInstruments = [
-  { id: 'saxophone', name: 'Saxophone', emoji: '🎷' },
-  { id: 'harmonica', name: 'Harmonica', emoji: '🎵' },
-  { id: 'steelpan', name: 'Steel Pan', emoji: '🥁' },
-  { id: 'electric-guitar', name: 'Electric Guitar', emoji: '🎸' }
+  { id: 'saxophone' as Instrument, name: 'Saxophone', emoji: '🎷' },
+  { id: 'harmonica' as Instrument, name: 'Harmonica', emoji: '🎵' },
+  { id: 'steelpan' as Instrument, name: 'Steel Pan', emoji: '🥁' },
+  { id: 'electric-guitar' as Instrument, name: 'Electric Guitar', emoji: '🎸' }
 ];
 
 const groups = [
-  { id: 'orchestra', name: 'Orchestra', emoji: '🎼' },
-  { id: 'soul-band', name: "60's Soul Band", emoji: '🎤' }
+  { id: 'orchestra' as Group, name: 'Orchestra', emoji: '🎼' },
+  { id: 'soul-band' as Group, name: "60's Soul Band", emoji: '🎤' }
 ];
 
 const ImportScreen: React.FC<ImportScreenProps> = ({
