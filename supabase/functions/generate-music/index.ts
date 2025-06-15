@@ -51,37 +51,43 @@ serve(async (req) => {
 
     console.log('Input audio URL:', inputAudioUrl);
 
-    // Create music generation prompt based on mode and selection
+    // Create enhanced prompts that actually describe transforming the input
     let prompt = '';
+    let duration = 60; // Extended to 60 seconds instead of 30
+    
     if (mode === 'solo') {
       const instrumentPrompts = {
-        'saxophone': 'smooth jazz saxophone solo, melodic and soulful',
-        'harmonica': 'bluesy harmonica melody, expressive and emotional',
-        'steelpan': 'caribbean steelpan rhythm, tropical and upbeat',
-        'electric-guitar': 'electric guitar riffs, energetic rock style'
+        'saxophone': 'Transform this audio into a smooth jazz saxophone arrangement with melodic improvisation, maintaining the original rhythm and harmony while adding soulful saxophone melodies',
+        'harmonica': 'Reimagine this piece as a bluesy harmonica melody, keeping the core musical structure while adding expressive harmonica techniques and blues progressions',
+        'steelpan': 'Convert this music into a vibrant caribbean steelpan arrangement, preserving the original tempo while adding tropical steel drum rhythms and island harmonies',
+        'electric-guitar': 'Transform this into an electric guitar-driven piece with energetic riffs and rock elements, maintaining the original musical foundation while adding guitar-specific techniques'
       };
-      prompt = instrumentPrompts[instrument] || 'melodic instrumental solo';
+      prompt = instrumentPrompts[instrument] || 'melodic instrumental solo arrangement of the input audio';
     } else {
       const groupPrompts = {
-        'orchestra': 'full orchestra arrangement, classical and rich harmonies',
-        'soul-band': '1960s soul band, groovy rhythm section with horns'
+        'orchestra': 'Arrange this music for full orchestra with rich string sections, brass, and woodwinds, expanding the original composition into a classical orchestral masterpiece',
+        'soul-band': 'Transform this into a 1960s soul band arrangement with groovy rhythm section, horn section, and vintage soul styling while keeping the original musical essence'
       };
-      prompt = groupPrompts[group] || 'full band arrangement';
+      prompt = groupPrompts[group] || 'full band arrangement of the input audio';
     }
 
     console.log('Generated prompt:', prompt);
 
-    // Run MusicGen model using the correct model identifier
-    console.log('Calling Replicate MusicGen...');
+    // Use MusicGen with the input audio as reference
+    console.log('Calling Replicate MusicGen with input audio...');
     const output = await replicate.run(
       "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
       {
         input: {
           prompt: prompt,
-          duration: 30,
+          audio_input: inputAudioUrl, // Actually use the uploaded audio as input
+          duration: duration,
           model_version: "stereo-large",
           output_format: "wav",
-          normalization_strategy: "loudness"
+          normalization_strategy: "loudness",
+          continuation: true, // This makes it actually use the input audio
+          continuation_start: 0,
+          continuation_end: Math.min(30, duration) // Use first 30 seconds of input as seed
         }
       }
     );
@@ -131,11 +137,12 @@ serve(async (req) => {
       .insert({
         user_id: inputAudio.user_id,
         filename: generatedFileName,
-        original_filename: `Generated ${mode} - ${instrument || group}.wav`,
+        original_filename: `Generated ${mode} - ${instrument || group} (60s).wav`,
         file_path: generatedFilePath,
         file_size: audioBuffer.byteLength,
         mime_type: 'audio/wav',
         file_type: 'generated',
+        duration_seconds: duration,
         waveform_data: [] // Will be generated later if needed
       })
       .select()
@@ -167,7 +174,8 @@ serve(async (req) => {
         projectId,
         outputAudioId: generatedAudio.id,
         audioUrl: generatedPublicUrl,
-        message: 'Music generation completed successfully'
+        duration: duration,
+        message: 'Enhanced music generation completed successfully'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
