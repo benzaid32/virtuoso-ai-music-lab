@@ -17,23 +17,8 @@ export class MusicGenService implements MusicGenerationService {
   }
 
   async generateMusic(prompt: string, duration: number): Promise<string> {
-    const Replicate = (await import("https://esm.sh/replicate@0.25.2")).default;
-    const replicate = new Replicate({ auth: this.apiKey });
-
-    const output = await replicate.run(
-      "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
-      {
-        input: {
-          prompt,
-          duration,
-          model_version: "stereo-large",
-          output_format: "wav",
-          normalization_strategy: "loudness",
-          continuation: false
-        }
-      }
-    );
-
-    return Array.isArray(output) ? output[0] : output;
+    // This service is only used in edge functions where Replicate import works
+    // Client-side code should call the edge function instead
+    throw new Error('MusicGenService should only be used in edge functions');
   }
 }

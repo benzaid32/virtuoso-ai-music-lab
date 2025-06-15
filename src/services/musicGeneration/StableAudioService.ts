@@ -1,5 +1,5 @@
 
-import { MusicGenerationService, MusicGenerationConfig, MusicGenerationResult } from './interfaces';
+import { MusicGenerationService } from './interfaces';
 
 export class StableAudioService implements MusicGenerationService {
   private apiKey: string;
@@ -14,6 +14,8 @@ export class StableAudioService implements MusicGenerationService {
   }
 
   async isAvailable(): Promise<boolean> {
+    if (!this.apiKey) return false;
+    
     try {
       const response = await fetch('https://api.stability.ai/v1/user/account', {
         headers: {
@@ -27,6 +29,10 @@ export class StableAudioService implements MusicGenerationService {
   }
 
   async generateMusic(prompt: string, duration: number): Promise<string> {
+    if (!this.apiKey) {
+      throw new Error('Stable Audio API key not configured');
+    }
+
     const response = await fetch(this.baseUrl, {
       method: 'POST',
       headers: {
@@ -42,13 +48,14 @@ export class StableAudioService implements MusicGenerationService {
     });
 
     if (!response.ok) {
-      throw new Error(`Stable Audio API error: ${response.status} - ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Stable Audio API error: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json();
     
     if (!result.audio_url) {
-      throw new Error('No audio URL returned from Stable Audio');
+      throw new Error('No audio URL returned from Stable Audio API');
     }
 
     return result.audio_url;
