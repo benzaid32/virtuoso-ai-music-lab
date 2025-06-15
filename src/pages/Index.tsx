@@ -98,6 +98,9 @@ const Index = () => {
     setCurrentScreen('import');
     setImportedFile(null);
     setGeneratedFile(null);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
   };
 
   const handleSignOut = async () => {
@@ -203,6 +206,9 @@ const Index = () => {
           setIsPlaying={setIsPlaying}
           currentTime={currentTime}
           duration={duration}
+          audioUrl={generatedFile?.url}
+          onTimeUpdate={setCurrentTime}
+          onDurationChange={setDuration}
         />
       </div>
     </div>
