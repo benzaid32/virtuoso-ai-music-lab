@@ -51,46 +51,64 @@ serve(async (req) => {
 
     console.log('Input audio URL:', inputAudioUrl);
 
-    // Create enhanced prompts that actually describe transforming the input
+    // Create more specific prompts for better results
     let prompt = '';
-    let duration = 60; // Extended to 60 seconds instead of 30
+    let duration = 30; // Reduce duration to 30 seconds for more reliable generation
     
     if (mode === 'solo') {
       const instrumentPrompts = {
-        'saxophone': 'Transform this audio into a smooth jazz saxophone arrangement with melodic improvisation, maintaining the original rhythm and harmony while adding soulful saxophone melodies',
-        'harmonica': 'Reimagine this piece as a bluesy harmonica melody, keeping the core musical structure while adding expressive harmonica techniques and blues progressions',
-        'steelpan': 'Convert this music into a vibrant caribbean steelpan arrangement, preserving the original tempo while adding tropical steel drum rhythms and island harmonies',
-        'electric-guitar': 'Transform this into an electric guitar-driven piece with energetic riffs and rock elements, maintaining the original musical foundation while adding guitar-specific techniques'
+        'saxophone': 'smooth jazz saxophone solo with melodic improvisation',
+        'harmonica': 'blues harmonica melody with expressive bends and vibrato',
+        'steelpan': 'caribbean steelpan rhythm with tropical melodies',
+        'electric-guitar': 'electric guitar solo with rock riffs and solos'
       };
-      prompt = instrumentPrompts[instrument] || 'melodic instrumental solo arrangement of the input audio';
+      prompt = instrumentPrompts[instrument] || 'melodic instrumental solo';
     } else {
       const groupPrompts = {
-        'orchestra': 'Arrange this music for full orchestra with rich string sections, brass, and woodwinds, expanding the original composition into a classical orchestral masterpiece',
-        'soul-band': 'Transform this into a 1960s soul band arrangement with groovy rhythm section, horn section, and vintage soul styling while keeping the original musical essence'
+        'orchestra': 'full orchestral arrangement with strings, brass and woodwinds',
+        'soul-band': '1960s soul band with rhythm section and horn arrangements'
       };
-      prompt = groupPrompts[group] || 'full band arrangement of the input audio';
+      prompt = groupPrompts[group] || 'full band arrangement';
     }
 
     console.log('Generated prompt:', prompt);
 
-    // Use MusicGen with the input audio as reference
-    console.log('Calling Replicate MusicGen with input audio...');
-    const output = await replicate.run(
-      "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
-      {
-        input: {
-          prompt: prompt,
-          input_audio: inputAudioUrl, // Changed from audio_input to input_audio
-          duration: duration,
-          model_version: "stereo-large",
-          output_format: "wav",
-          normalization_strategy: "loudness",
-          continuation: true,
-          continuation_start: 0,
-          continuation_end: Math.min(30, duration) // Use first 30 seconds of input as seed
+    // Use MusicGen without continuation first, then try with continuation if needed
+    console.log('Calling Replicate MusicGen...');
+    let output;
+    
+    try {
+      // First try without continuation to see if the basic generation works
+      output = await replicate.run(
+        "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
+        {
+          input: {
+            prompt: prompt,
+            duration: duration,
+            model_version: "stereo-large",
+            output_format: "wav",
+            normalization_strategy: "loudness"
+          }
         }
-      }
-    );
+      );
+    } catch (basicError) {
+      console.error('Basic generation failed, trying with melody conditioning:', basicError);
+      
+      // If basic generation fails, try with melody conditioning
+      output = await replicate.run(
+        "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
+        {
+          input: {
+            prompt: prompt,
+            melody: inputAudioUrl, // Use melody parameter instead of input_audio
+            duration: duration,
+            model_version: "stereo-large",
+            output_format: "wav",
+            normalization_strategy: "loudness"
+          }
+        }
+      );
+    }
 
     console.log('MusicGen output:', output);
 
@@ -137,7 +155,7 @@ serve(async (req) => {
       .insert({
         user_id: inputAudio.user_id,
         filename: generatedFileName,
-        original_filename: `Generated ${mode} - ${instrument || group} (60s).wav`,
+        original_filename: `Generated ${mode} - ${instrument || group} (30s).wav`,
         file_path: generatedFilePath,
         file_size: audioBuffer.byteLength,
         mime_type: 'audio/wav',
@@ -175,7 +193,7 @@ serve(async (req) => {
         outputAudioId: generatedAudio.id,
         audioUrl: generatedPublicUrl,
         duration: duration,
-        message: 'Enhanced music generation completed successfully'
+        message: 'Music generation completed successfully'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
