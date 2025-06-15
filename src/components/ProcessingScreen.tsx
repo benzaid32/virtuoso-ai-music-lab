@@ -23,8 +23,8 @@ const ProcessingScreen: React.FC<ProcessingScreenProps> = ({
   return (
     <div className="space-y-6 text-center">
       <div>
-        <h2 className="text-2xl font-bold text-yellow-400 mb-2">AI Processing</h2>
-        <p className="text-gray-400">Transforming your audio with {selectedMode} arrangement...</p>
+        <h2 className="text-2xl font-bold text-yellow-400 mb-2">AI Music Generation</h2>
+        <p className="text-gray-400">Creating new music based on analyzed characteristics...</p>
         {progress && (
           <p className="text-sm text-blue-400 mt-2">{progress}</p>
         )}
@@ -46,7 +46,7 @@ const ProcessingScreen: React.FC<ProcessingScreenProps> = ({
         <div className="flex justify-center items-center space-x-2 mb-6">
           {generating && <Loader2 className="w-5 h-5 animate-spin text-blue-400" />}
           <span className="text-white">
-            {generating ? (progress || 'AI is analyzing and transforming your audio...') : 'Processing complete!'}
+            {generating ? (progress || 'AI is creating new music based on your audio analysis...') : 'Generation complete!'}
           </span>
         </div>
       </div>
@@ -54,33 +54,35 @@ const ProcessingScreen: React.FC<ProcessingScreenProps> = ({
       {/* Enhanced Info Display */}
       {importedFile && (
         <div className="bg-gray-800/50 rounded-lg p-4 mb-6">
-          <h3 className="text-white font-semibold mb-2">Input Audio:</h3>
+          <h3 className="text-white font-semibold mb-2">Source Audio:</h3>
           <p className="text-gray-400 mb-2">{importedFile.name}</p>
           <div className="text-sm text-blue-400">
-            <p>✨ AI will use your audio as the foundation</p>
-            <p>🎵 Extended to 60 seconds duration</p>
+            <p>🧠 AI analyzed musical characteristics</p>
+            <p>🎵 Generating new composition with same DNA</p>
+            <p>⏱️ Extended to 60 seconds duration</p>
           </div>
         </div>
       )}
 
       {/* Enhanced Configuration Summary */}
       <div className="bg-gray-800/50 rounded-lg p-4">
-        <h3 className="text-white font-semibold mb-2">Transformation Settings:</h3>
+        <h3 className="text-white font-semibold mb-2">Generation Settings:</h3>
         <div className="space-y-2 text-gray-400">
           <p>Mode: <span className="text-white capitalize">{selectedMode}</span></p>
           {selectedMode === 'solo' ? (
-            <p>Target: <span className="text-white capitalize">{selectedInstrument.replace('-', ' ')} arrangement</span></p>
+            <p>Target: <span className="text-white capitalize">{selectedInstrument.replace('-', ' ')} performance</span></p>
           ) : (
             <p>Target: <span className="text-white">{selectedGroup === 'orchestra' ? 'Full Orchestra' : "60's Soul Band"} arrangement</span></p>
           )}
+          <p>Quality: <span className="text-white">Professional Grade</span></p>
           <p>Duration: <span className="text-white">60 seconds</span></p>
-          <p>Quality: <span className="text-white">Stereo Hi-Fi</span></p>
+          <p>Method: <span className="text-white">AI Analysis + Generation</span></p>
         </div>
       </div>
 
       {/* Enhanced Waveform Visualization */}
       <div className="bg-gray-900/50 rounded-lg p-4">
-        <h3 className="text-white font-semibold mb-4">Audio Analysis</h3>
+        <h3 className="text-white font-semibold mb-4">AI Processing</h3>
         <div className="flex items-end justify-center space-x-1 h-16">
           {Array.from({ length: 60 }, (_, i) => (
             <div
@@ -95,7 +97,7 @@ const ProcessingScreen: React.FC<ProcessingScreenProps> = ({
           ))}
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          {generating ? 'Analyzing musical patterns...' : 'Analysis complete'}
+          {generating ? 'Generating musical patterns...' : 'Generation complete'}
         </p>
       </div>
     </div>

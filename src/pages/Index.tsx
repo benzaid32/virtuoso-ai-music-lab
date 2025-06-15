@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useAudioUpload } from '../hooks/useAudioUpload';
-import { useMusicGeneration } from '../hooks/useMusicGeneration';
+import { useMusicAnalysis } from '../hooks/useMusicAnalysis';
+import { useStableAudio } from '../hooks/useStableAudio';
 import AuthForm from '../components/AuthForm';
 import ImportScreen from '../components/ImportScreen';
 import ProcessingScreen from '../components/ProcessingScreen';
 import ExportScreen from '../components/ExportScreen';
+import MusicAnalysisDisplay from '../components/MusicAnalysisDisplay';
 import { Button } from '@/components/ui/button';
 import { LogOut, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,67 +27,82 @@ export interface AudioFile {
 const Index = () => {
   const { user, loading, signOut } = useAuth();
   const { uploadAudioFile, uploading } = useAudioUpload();
-  const { generateMusic, generating, progress } = useMusicGeneration();
+  const { analyzeAudio, analyzing, analysis, setAnalysis } = useMusicAnalysis();
+  const { generateWithStableAudio, generating, progress } = useStableAudio();
   
-  const [currentScreen, setCurrentScreen] = useState<'import' | 'processing' | 'export'>('import');
+  const [currentScreen, setCurrentScreen] = useState<'import' | 'analysis' | 'processing' | 'export'>('import');
   const [selectedMode, setSelectedMode] = useState<Mode>('solo');
   const [selectedInstrument, setSelectedInstrument] = useState<Instrument>('saxophone');
   const [selectedGroup, setSelectedGroup] = useState<Group>('orchestra');
   const [importedFile, setImportedFile] = useState<AudioFile | null>(null);
   const [generatedFile, setGeneratedFile] = useState<AudioFile | null>(null);
+  const [uploadedAudioFile, setUploadedAudioFile] = useState<File | null>(null);
 
   const handleFileImport = async (file: File) => {
-    console.log('Importing file:', file.name);
+    console.log('Importing and analyzing file:', file.name);
+    setUploadedAudioFile(file);
+    
+    // Upload file first
     const uploadedFile = await uploadAudioFile(file);
     if (uploadedFile) {
       setImportedFile(uploadedFile);
-      setCurrentScreen('processing');
+      setCurrentScreen('analysis');
       
-      // Start music generation
-      const result = await generateMusic(
-        selectedMode,
-        selectedMode === 'solo' ? selectedInstrument : null,
-        selectedMode === 'group' ? selectedGroup : null,
-        uploadedFile.id!
-      );
+      // Start music analysis
+      const musicAnalysis = await analyzeAudio(file);
+      if (musicAnalysis) {
+        console.log('Analysis complete:', musicAnalysis);
+      }
+    }
+  };
+
+  const handleStartGeneration = async () => {
+    if (!importedFile || !analysis) {
+      console.error('Missing imported file or analysis');
+      return;
+    }
+
+    setCurrentScreen('processing');
+    
+    // Start enhanced music generation
+    const result = await generateWithStableAudio(
+      selectedMode,
+      selectedMode === 'solo' ? selectedInstrument : null,
+      selectedMode === 'group' ? selectedGroup : null,
+      importedFile.id!,
+      analysis
+    );
+    
+    if (result) {
+      console.log('Generation result:', result);
       
-      if (result) {
-        console.log('Generation result:', result);
-        
-        // Fetch the generated audio file details
-        const { data: audioFile, error } = await supabase
-          .from('audio_files')
-          .select('*')
-          .eq('id', result.outputAudioId)
-          .single();
+      // Fetch the generated audio file details
+      const { data: audioFile, error } = await supabase
+        .from('audio_files')
+        .select('*')
+        .eq('id', result.outputAudioId)
+        .single();
 
-        if (!error && audioFile) {
-          console.log('Generated audio file:', audioFile);
-          
-          // Get public URL
-          const { data: { publicUrl } } = supabase.storage
-            .from('audio-files')
-            .getPublicUrl(audioFile.file_path);
+      if (!error && audioFile) {
+        const { data: { publicUrl } } = supabase.storage
+          .from('audio-files')
+          .getPublicUrl(audioFile.file_path);
 
-          // Safely handle waveform_data
-          let waveformData: number[] = [];
-          if (audioFile.waveform_data) {
-            if (Array.isArray(audioFile.waveform_data)) {
-              waveformData = audioFile.waveform_data.filter((item): item is number => typeof item === 'number');
-            }
+        let waveformData: number[] = [];
+        if (audioFile.waveform_data) {
+          if (Array.isArray(audioFile.waveform_data)) {
+            waveformData = audioFile.waveform_data.filter((item): item is number => typeof item === 'number');
           }
-
-          setGeneratedFile({
-            id: audioFile.id,
-            name: audioFile.original_filename,
-            url: publicUrl,
-            waveform: waveformData
-          });
-          
-          setCurrentScreen('export');
-        } else {
-          console.error('Failed to fetch generated audio file:', error);
         }
+
+        setGeneratedFile({
+          id: audioFile.id,
+          name: audioFile.original_filename,
+          url: publicUrl,
+          waveform: waveformData
+        });
+        
+        setCurrentScreen('export');
       }
     }
   };
@@ -94,6 +111,8 @@ const Index = () => {
     setCurrentScreen('import');
     setImportedFile(null);
     setGeneratedFile(null);
+    setAnalysis(null);
+    setUploadedAudioFile(null);
   };
 
   const handleSignOut = async () => {
@@ -125,7 +144,7 @@ const Index = () => {
             <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-400 bg-clip-text text-transparent mb-2">
               Virtuoso.ai
             </h1>
-            <p className="text-xl text-gray-300">AI-Powered Music Generator</p>
+            <p className="text-xl text-gray-300">AI Music Analysis & Generation</p>
           </div>
           
           <div className="flex items-center space-x-4">
@@ -147,7 +166,7 @@ const Index = () => {
 
         {/* Main Content Area */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Top Screen - Import or Processing */}
+          {/* Left Panel - Main workflow */}
           <div className="audio-panel rounded-3xl p-8 min-h-[400px] glow-gold">
             {currentScreen === 'import' && (
               <ImportScreen
@@ -161,6 +180,33 @@ const Index = () => {
                 uploading={uploading}
               />
             )}
+            
+            {currentScreen === 'analysis' && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-yellow-400 mb-2">Music Analysis</h2>
+                  <p className="text-gray-400">AI is analyzing your music's characteristics</p>
+                </div>
+                
+                <MusicAnalysisDisplay analysis={analysis} analyzing={analyzing} />
+                
+                {analysis && !analyzing && (
+                  <div className="text-center">
+                    <Button
+                      onClick={handleStartGeneration}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-3 text-lg"
+                      disabled={generating}
+                    >
+                      Generate AI Music
+                    </Button>
+                    <p className="text-sm text-gray-400 mt-2">
+                      This will create new music matching your audio's key, tempo, and energy
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            
             {currentScreen === 'processing' && (
               <ProcessingScreen
                 selectedMode={selectedMode}
@@ -171,6 +217,7 @@ const Index = () => {
                 progress={progress}
               />
             )}
+            
             {currentScreen === 'export' && (
               <ExportScreen
                 generatedFile={generatedFile}
@@ -179,17 +226,36 @@ const Index = () => {
             )}
           </div>
 
-          {/* Right Panel - 3D Visualization */}
+          {/* Right Panel - Analysis Summary or 3D Visualization */}
           <div className="audio-panel rounded-3xl p-8 min-h-[400px] glow-blue">
-            <div className="h-full bg-gradient-to-b from-gray-900/50 to-black/50 rounded-2xl flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-32 h-32 mx-auto mb-4 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full animate-pulse" />
-                </div>
-                <p className="text-gray-400">3D Visualization</p>
-                <p className="text-sm text-gray-500">Coming soon...</p>
+            {analysis ? (
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-white">Musical DNA</h3>
+                <MusicAnalysisDisplay analysis={analysis} analyzing={false} />
+                
+                {importedFile && (
+                  <div className="bg-gray-800/50 rounded-lg p-4">
+                    <h4 className="text-white font-medium mb-2">Source Audio:</h4>
+                    <p className="text-gray-400 text-sm">{importedFile.name}</p>
+                    <div className="mt-2 text-xs text-blue-400">
+                      <p>🎵 Key: {analysis.key} {analysis.mode}</p>
+                      <p>⏱️ Tempo: {analysis.tempo} BPM</p>
+                      <p>⚡ Energy: {Math.round(analysis.energy)}%</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              <div className="h-full bg-gradient-to-b from-gray-900/50 to-black/50 rounded-2xl flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-32 h-32 mx-auto mb-4 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center">
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full animate-pulse" />
+                  </div>
+                  <p className="text-gray-400">Upload audio to see analysis</p>
+                  <p className="text-sm text-gray-500">Key, tempo & energy detection</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
