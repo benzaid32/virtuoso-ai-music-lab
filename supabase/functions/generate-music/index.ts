@@ -71,25 +71,17 @@ serve(async (req) => {
 
     console.log('Generated prompt:', prompt);
 
-    // Run MusicGen model
+    // Run MusicGen model using the correct model identifier
     console.log('Calling Replicate MusicGen...');
     const output = await replicate.run(
-      "meta/musicgen-large",
+      "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
       {
         input: {
-          model_version: "large",
           prompt: prompt,
           duration: 30,
-          continuation: true,
-          continuation_start: 0,
-          continuation_end: 15,
-          normalization_strategy: "loudness",
-          top_k: 250,
-          top_p: 0.0,
-          temperature: 1.0,
-          classifier_free_guidance: 3.0,
+          model_version: "stereo-large",
           output_format: "wav",
-          seed: -1
+          normalization_strategy: "loudness"
         }
       }
     );
