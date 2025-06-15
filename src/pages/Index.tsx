@@ -71,11 +71,19 @@ const Index = () => {
             .from('audio-files')
             .getPublicUrl(audioFile.file_path);
 
+          // Safely handle waveform_data
+          let waveformData: number[] = [];
+          if (audioFile.waveform_data) {
+            if (Array.isArray(audioFile.waveform_data)) {
+              waveformData = audioFile.waveform_data.filter((item): item is number => typeof item === 'number');
+            }
+          }
+
           setGeneratedFile({
             id: audioFile.id,
             name: audioFile.original_filename,
             url: publicUrl,
-            waveform: audioFile.waveform_data || []
+            waveform: waveformData
           });
           
           setCurrentScreen('export');

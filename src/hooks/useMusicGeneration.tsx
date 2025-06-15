@@ -28,6 +28,7 @@ export const useMusicGeneration = () => {
 
     setGenerating(true);
     setProgress('Preparing music generation...');
+    let projectId: string | null = null;
 
     try {
       // Create project record
@@ -53,6 +54,7 @@ export const useMusicGeneration = () => {
         .single();
 
       if (projectError) throw projectError;
+      projectId = project.id;
 
       setProgress('Generating music with AI...');
       console.log('Calling music generation function...');
@@ -94,12 +96,12 @@ export const useMusicGeneration = () => {
     } catch (error: any) {
       console.error('Generation error:', error);
       
-      // Update project status to failed
-      if (project?.id) {
+      // Update project status to failed if we have a project ID
+      if (projectId) {
         await supabase
           .from('music_projects')
           .update({ status: 'failed' })
-          .eq('id', project.id);
+          .eq('id', projectId);
       }
 
       toast({
