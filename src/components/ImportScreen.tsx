@@ -12,7 +12,8 @@ interface ImportScreenProps {
   setSelectedInstrument: (instrument: Instrument) => void;
   selectedGroup: Group;
   setSelectedGroup: (group: Group) => void;
-  onFileImport: (file: any) => void;
+  onFileImport: (file: File) => void;
+  uploading?: boolean;
 }
 
 const soloInstruments = [
@@ -34,19 +35,13 @@ const ImportScreen: React.FC<ImportScreenProps> = ({
   setSelectedInstrument,
   selectedGroup,
   setSelectedGroup,
-  onFileImport
+  onFileImport,
+  uploading = false
 }) => {
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Generate mock waveform data
-      const waveform = Array.from({ length: 100 }, () => Math.random());
-      
-      onFileImport({
-        name: file.name,
-        url: URL.createObjectURL(file),
-        waveform
-      });
+      onFileImport(file);
     }
   }, [onFileImport]);
 
@@ -134,9 +129,13 @@ const ImportScreen: React.FC<ImportScreenProps> = ({
           <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <div className="space-y-2">
             <p className="text-white">Drop your audio file here or</p>
-            <Button variant="outline" className="border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black">
+            <Button 
+              variant="outline" 
+              className="border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"
+              disabled={uploading}
+            >
               <label htmlFor="file-upload" className="cursor-pointer">
-                Browse Files
+                {uploading ? 'Uploading...' : 'Browse Files'}
               </label>
             </Button>
             <input
@@ -145,6 +144,7 @@ const ImportScreen: React.FC<ImportScreenProps> = ({
               accept="audio/*"
               onChange={handleFileUpload}
               className="hidden"
+              disabled={uploading}
             />
           </div>
           <p className="text-sm text-gray-500 mt-2">Supports MP3, WAV, FLAC, and more</p>
