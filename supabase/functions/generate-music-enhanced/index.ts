@@ -15,6 +15,176 @@ interface MusicAnalysis {
   confidence: number;
 }
 
+// Enterprise-grade service interfaces
+interface MusicGenerationService {
+  generateMusic(prompt: string, duration: number): Promise<string>;
+  isAvailable(): Promise<boolean>;
+  getName(): string;
+}
+
+class StableAudioService implements MusicGenerationService {
+  private apiKey: string;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  getName(): string {
+    return 'Stable Audio';
+  }
+
+  async isAvailable(): Promise<boolean> {
+    try {
+      const response = await fetch('https://api.stability.ai/v1/user/account', {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async generateMusic(prompt: string, duration: number): Promise<string> {
+    const response = await fetch('https://api.stability.ai/v2beta/stable-audio/generate/music', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt,
+        duration,
+        cfg_scale: 7,
+        seed: Math.floor(Math.random() * 1000000)
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Stable Audio API error: ${response.status} - ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.audio_url) {
+      throw new Error('No audio URL returned from Stable Audio');
+    }
+
+    return result.audio_url;
+  }
+}
+
+class MusicGenService implements MusicGenerationService {
+  private apiKey: string;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  getName(): string {
+    return 'MusicGen';
+  }
+
+  async isAvailable(): Promise<boolean> {
+    return !!this.apiKey;
+  }
+
+  async generateMusic(prompt: string, duration: number): Promise<string> {
+    const Replicate = (await import("https://esm.sh/replicate@0.25.2")).default;
+    const replicate = new Replicate({ auth: this.apiKey });
+
+    const output = await replicate.run(
+      "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
+      {
+        input: {
+          prompt,
+          duration,
+          model_version: "stereo-large",
+          output_format: "wav",
+          normalization_strategy: "loudness",
+          continuation: false
+        }
+      }
+    );
+
+    return Array.isArray(output) ? output[0] : output;
+  }
+}
+
+class MusicGenerationOrchestrator {
+  private services: MusicGenerationService[] = [];
+  private maxRetries = 2;
+  private timeout = 120000;
+
+  constructor(stableAudioKey?: string, replicateKey?: string) {
+    if (stableAudioKey) {
+      this.services.push(new StableAudioService(stableAudioKey));
+    }
+    if (replicateKey) {
+      this.services.push(new MusicGenService(replicateKey));
+    }
+  }
+
+  async generateMusic(prompt: string, duration: number): Promise<{ success: boolean; audioUrl?: string; error?: string; serviceName: string }> {
+    for (const service of this.services) {
+      console.log(`Attempting generation with ${service.getName()}...`);
+      
+      try {
+        const isAvailable = await this.withTimeout(service.isAvailable(), 10000);
+        
+        if (!isAvailable) {
+          console.log(`${service.getName()} is not available, trying next service...`);
+          continue;
+        }
+
+        for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+          try {
+            console.log(`${service.getName()} attempt ${attempt}/${this.maxRetries}`);
+            
+            const audioUrl = await this.withTimeout(
+              service.generateMusic(prompt, duration),
+              this.timeout
+            );
+
+            return {
+              success: true,
+              audioUrl,
+              serviceName: service.getName()
+            };
+          } catch (error) {
+            console.error(`${service.getName()} attempt ${attempt} failed:`, error);
+            
+            if (attempt < this.maxRetries) {
+              await this.delay(2000 * attempt);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`${service.getName()} service error:`, error);
+      }
+    }
+
+    return {
+      success: false,
+      error: 'All music generation services failed',
+      serviceName: 'None'
+    };
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+    });
+
+    return Promise.race([promise, timeoutPromise]);
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -27,6 +197,7 @@ serve(async (req) => {
     );
 
     const stableAudioApiKey = Deno.env.get('STABLE_AUDIO_API_KEY');
+    const replicateApiKey = Deno.env.get('REPLICATE_API_KEY');
     
     const { projectId, mode, instrument, group, inputAudioId, musicAnalysis } = await req.json();
 
@@ -45,12 +216,13 @@ serve(async (req) => {
     }
 
     // Create enhanced prompts based on music analysis
-    let enhancedPrompt = '';
     const keyInfo = `${musicAnalysis.key} ${musicAnalysis.mode}`;
     const tempoInfo = `${musicAnalysis.tempo} BPM`;
     const energyLevel = musicAnalysis.energy > 70 ? 'high energy' : 
                       musicAnalysis.energy > 40 ? 'medium energy' : 'low energy';
 
+    let enhancedPrompt = '';
+    
     if (mode === 'solo') {
       const instrumentPrompts = {
         'saxophone': `Professional jazz saxophone solo in ${keyInfo} at ${tempoInfo}, ${energyLevel}, smooth melodic improvisation with rich harmonic content`,
@@ -69,71 +241,19 @@ serve(async (req) => {
 
     console.log('Enhanced prompt:', enhancedPrompt);
 
-    let generatedAudioUrl: string;
+    // Use enterprise orchestrator for robust generation
+    const orchestrator = new MusicGenerationOrchestrator(stableAudioApiKey, replicateApiKey);
+    const generationResult = await orchestrator.generateMusic(enhancedPrompt, 60);
 
-    // Try Stable Audio first if API key is available
-    if (stableAudioApiKey) {
-      console.log('Using Stable Audio API...');
-      
-      const stableAudioResponse = await fetch('https://api.stability.ai/v2beta/stable-audio/generate/music', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${stableAudioApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: enhancedPrompt,
-          duration: 60,
-          cfg_scale: 7,
-          seed: Math.floor(Math.random() * 1000000)
-        })
-      });
-
-      if (!stableAudioResponse.ok) {
-        throw new Error(`Stable Audio API error: ${stableAudioResponse.status}`);
-      }
-
-      const stableResult = await stableAudioResponse.json();
-      
-      if (stableResult.audio_url) {
-        generatedAudioUrl = stableResult.audio_url;
-      } else {
-        throw new Error('No audio URL returned from Stable Audio');
-      }
-    } else {
-      console.log('Stable Audio API key not found, falling back to enhanced MusicGen...');
-      
-      // Fallback to enhanced MusicGen with better prompts
-      const Replicate = (await import("https://esm.sh/replicate@0.25.2")).default;
-      const replicateApiKey = Deno.env.get('REPLICATE_API_KEY');
-      
-      if (!replicateApiKey) {
-        throw new Error('No API keys configured for music generation');
-      }
-
-      const replicate = new Replicate({ auth: replicateApiKey });
-
-      const output = await replicate.run(
-        "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
-        {
-          input: {
-            prompt: enhancedPrompt,
-            duration: 60,
-            model_version: "stereo-large",
-            output_format: "wav",
-            normalization_strategy: "loudness",
-            continuation: false
-          }
-        }
-      );
-
-      generatedAudioUrl = Array.isArray(output) ? output[0] : output;
+    if (!generationResult.success) {
+      throw new Error(generationResult.error || 'Music generation failed');
     }
 
-    console.log('Generated audio URL:', generatedAudioUrl);
+    console.log(`Generated successfully with ${generationResult.serviceName}`);
+    console.log('Generated audio URL:', generationResult.audioUrl);
 
     // Download and store the generated audio
-    const audioResponse = await fetch(generatedAudioUrl);
+    const audioResponse = await fetch(generationResult.audioUrl!);
     if (!audioResponse.ok) {
       throw new Error('Failed to download generated audio');
     }
@@ -202,7 +322,8 @@ serve(async (req) => {
         audioUrl: publicUrl,
         duration: 60,
         analysis: musicAnalysis,
-        message: `AI music generated in ${keyInfo} at ${tempoInfo}`
+        serviceName: generationResult.serviceName,
+        message: `AI music generated with ${generationResult.serviceName} in ${keyInfo} at ${tempoInfo}`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
