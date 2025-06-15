@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { useToast } = useToast';
+import { useToast } from '@/hooks/use-toast';
 import { Instrument, Group, Mode } from '../pages/Index';
 
 export const useMusicGeneration = () => {
