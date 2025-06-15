@@ -80,12 +80,12 @@ serve(async (req) => {
       {
         input: {
           prompt: prompt,
-          audio_input: inputAudioUrl, // Actually use the uploaded audio as input
+          input_audio: inputAudioUrl, // Changed from audio_input to input_audio
           duration: duration,
           model_version: "stereo-large",
           output_format: "wav",
           normalization_strategy: "loudness",
-          continuation: true, // This makes it actually use the input audio
+          continuation: true,
           continuation_start: 0,
           continuation_end: Math.min(30, duration) // Use first 30 seconds of input as seed
         }
@@ -143,7 +143,7 @@ serve(async (req) => {
         mime_type: 'audio/wav',
         file_type: 'generated',
         duration_seconds: duration,
-        waveform_data: [] // Will be generated later if needed
+        waveform_data: []
       })
       .select()
       .single();
