@@ -3,7 +3,10 @@ import React, { useCallback } from 'react';
 import { Upload, Music, Users, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Instrument, Group, Mode } from '../pages/Index';
+
+export type Mode = 'solo' | 'group';
+export type Instrument = 'saxophone' | 'harmonica' | 'steelpan' | 'electric-guitar';
+export type Group = 'orchestra' | 'soul-band';
 
 interface ImportScreenProps {
   selectedMode: Mode;
@@ -71,7 +74,7 @@ const ImportScreen: React.FC<ImportScreenProps> = ({
         <h3 className="text-lg font-semibold text-white">Select Transformation Mode</h3>
         <div className="grid grid-cols-2 gap-4">
           <Button
-            variant={selectedMode === 'solo' ? 'default' : 'outline'}
+            variant={selectedMode === 'solo' ? 'default' : 'secondary'}
             className={`h-16 ${selectedMode === 'solo' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : 'border-gray-600 hover:border-yellow-400'}`}
             onClick={() => setSelectedMode('solo')}
           >
@@ -79,7 +82,7 @@ const ImportScreen: React.FC<ImportScreenProps> = ({
             Solo Instrument
           </Button>
           <Button
-            variant={selectedMode === 'group' ? 'default' : 'outline'}
+            variant={selectedMode === 'group' ? 'default' : 'secondary'}
             className={`h-16 ${selectedMode === 'group' ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : 'border-gray-600 hover:border-yellow-400'}`}
             onClick={() => setSelectedMode('group')}
           >
@@ -146,7 +149,7 @@ const ImportScreen: React.FC<ImportScreenProps> = ({
           <div className="space-y-2">
             <p className="text-white">Upload your audio file for AI transformation</p>
             <Button 
-              variant="outline" 
+              variant="secondary" 
               className="border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"
               disabled={uploading}
             >

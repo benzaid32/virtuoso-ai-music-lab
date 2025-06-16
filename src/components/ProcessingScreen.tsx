@@ -1,7 +1,10 @@
 
 import React from 'react';
 import { Loader2, Wand2, Music2 } from 'lucide-react';
-import { Instrument, Group, Mode } from '../pages/Index';
+
+export type Mode = 'solo' | 'group';
+export type Instrument = 'saxophone' | 'harmonica' | 'steelpan' | 'electric-guitar';
+export type Group = 'orchestra' | 'soul-band';
 
 interface ProcessingScreenProps {
   selectedMode: Mode;
