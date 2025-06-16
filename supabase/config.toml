@@ -21,11 +21,9 @@ port = 54324
 
 [storage]
 enabled = true
-port = 54325
 
 [auth]
 enabled = true
-port = 54326
 
 [functions.generate-music]
 verify_jwt = true

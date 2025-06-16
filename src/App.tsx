@@ -15,6 +15,7 @@ interface AudioFile {
   name: string;
   url: string;
   waveform: WaveformData;
+  file?: File;
 }
 
 type AppState = 'import' | 'analyzing' | 'analyzed' | 'generating' | 'completed';
@@ -51,67 +52,18 @@ export default function App() {
     setProgress(10);
 
     try {
-      // Process audio file
+      // Process audio file locally for analysis
       const { analysis: audioAnalysis, waveform } = await AudioProcessor.processAudioFile(file);
-      setProgress(40);
-
-      // Ensure anonymous session for Supabase operations
-      let currentUser;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        const { data: authData } = await supabase.auth.signInAnonymously();
-        if (!authData.user) throw new Error('Failed to create anonymous session');
-        currentUser = authData.user;
-      } else {
-        currentUser = session.user;
-      }
-
-      setProgress(60);
-
-      // Upload to Supabase storage with anonymous user
-      const timestamp = Date.now();
-      const fileName = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-      const filePath = `${currentUser.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('audio-files')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      setProgress(80);
-
-      // Create database record with anonymous user
-      const { data: audioFile, error: dbError } = await supabase
-        .from('audio_files')
-        .insert({
-          user_id: currentUser.id,
-          filename: fileName,
-          original_filename: file.name,
-          file_path: filePath,
-          file_size: file.size,
-          mime_type: file.type,
-          file_type: 'uploaded',
-          duration_seconds: audioAnalysis.duration,
-          waveform_data: waveform.peaks
-        })
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('audio-files')
-        .getPublicUrl(filePath);
-
       setProgress(100);
+
       setAnalysis(audioAnalysis);
       setSourceFile({
-        id: audioFile.id,
+        id: `temp-${Date.now()}`,
         name: file.name,
-        url: publicUrl,
-        waveform
-      });
+        url: URL.createObjectURL(file),
+        waveform,
+        file // Store the actual file for generation
+      } as any);
       setState('analyzed');
 
     } catch (err: any) {
@@ -123,52 +75,31 @@ export default function App() {
   };
 
   const handleGenerate = async () => {
-    if (!sourceFile || !analysis) return;
+    if (!sourceFile || !analysis || !sourceFile.file) return;
 
     setState('generating');
     setError(null);
     setProgress(10);
 
     try {
-      // Ensure anonymous session
-      let currentUser;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        const { data: authData } = await supabase.auth.signInAnonymously();
-        if (!authData.user) throw new Error('Failed to create anonymous session');
-        currentUser = authData.user;
-      } else {
-        currentUser = session.user;
-      }
-
-      // Create project record
-      const { data: project, error: projectError } = await supabase
-        .from('music_projects')
-        .insert({
-          user_id: currentUser.id,
-          name: `AI ${mode} - ${mode === 'solo' ? instrument : group}`,
-          mode,
-          instrument: mode === 'solo' ? instrument : null,
-          group_type: mode === 'group' ? group : null,
-          input_audio_id: sourceFile.id,
-          status: 'processing',
-          generation_settings: analysis as any
-        })
-        .select()
-        .single();
-
-      if (projectError) throw projectError;
-
+      // Convert file to base64 for edge function
+      const fileBuffer = await sourceFile.file.arrayBuffer();
+      const base64File = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
+      
       setProgress(30);
 
-      // Call Virtuoso AI Composer for professional music generation
+      // Call Virtuoso AI Composer edge function with everything
       const { data, error } = await supabase.functions.invoke('virtuoso-ai-composer', {
         body: {
-          projectId: project.id,
+          audioFile: {
+            name: sourceFile.name,
+            data: base64File,
+            mimeType: sourceFile.file.type,
+            size: sourceFile.file.size
+          },
           mode,
           instrument: mode === 'solo' ? instrument : null,
-          groupType: mode === 'group' ? group : null,
-          inputAudioId: sourceFile.id,
+          group: mode === 'group' ? group : null,
           musicAnalysis: analysis
         }
       });
@@ -178,24 +109,11 @@ export default function App() {
 
       setProgress(90);
 
-      // Get generated file
-      const { data: audioFile, error: audioError } = await supabase
-        .from('audio_files')
-        .select('*')
-        .eq('id', data.outputAudioId)
-        .single();
-
-      if (audioError) throw audioError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('audio-files')
-        .getPublicUrl(audioFile.file_path);
-
       setGeneratedFile({
-        id: audioFile.id,
-        name: audioFile.original_filename,
-        url: publicUrl,
-        waveform: { peaks: audioFile.waveform_data as number[] || [], duration: audioFile.duration_seconds || 60 }
+        id: data.outputAudioId || 'generated',
+        name: data.fileName || `Virtuoso AI ${mode} - ${mode === 'solo' ? instrument : group}.wav`,
+        url: data.audioUrl,
+        waveform: { peaks: [], duration: data.duration || 60 }
       });
 
       setProgress(100);

@@ -132,20 +132,49 @@ serve(async (req) => {
       throw new Error('STABLE_AUDIO_API_KEY environment variable is required for high-quality music generation');
     }
 
-    const { projectId, mode, instrument, group, inputAudioId, musicAnalysis } = await req.json();
+    const { audioFile, mode, instrument, group, musicAnalysis } = await req.json();
 
-    console.log('🎵 Professional music generation for project:', projectId);
+    console.log('🎵 Professional music generation');
     console.log('🎼 Music analysis:', musicAnalysis);
 
-    // Get input audio file details
+    // Upload input audio file to storage
+    const timestamp = Date.now();
+    const fileName = `${timestamp}_${audioFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filePath = `anonymous/${fileName}`;
+
+    // Convert base64 back to buffer
+    const inputAudioBuffer = Uint8Array.from(atob(audioFile.data), c => c.charCodeAt(0));
+
+    const { error: inputUploadError } = await supabase.storage
+      .from('audio-files')
+      .upload(filePath, inputAudioBuffer, {
+        contentType: audioFile.mimeType,
+        upsert: false
+      });
+
+    if (inputUploadError) {
+      throw new Error(`Failed to upload input audio: ${inputUploadError.message}`);
+    }
+
+    // Create input audio record
     const { data: inputAudio, error: audioError } = await supabase
       .from('audio_files')
-      .select('*')
-      .eq('id', inputAudioId)
+      .insert({
+        user_id: 'anonymous',
+        filename: fileName,
+        original_filename: audioFile.name,
+        file_path: filePath,
+        file_size: audioFile.size,
+        mime_type: audioFile.mimeType,
+        file_type: 'uploaded',
+        duration_seconds: musicAnalysis.duration || 0,
+        waveform_data: []
+      })
+      .select()
       .single();
 
     if (audioError) {
-      throw new Error(`Failed to get input audio: ${audioError.message}`);
+      throw new Error(`Failed to create audio record: ${audioError.message}`);
     }
 
     // Create professional prompt based on real musical analysis
@@ -216,26 +245,12 @@ serve(async (req) => {
       throw new Error(`Failed to create record: ${generatedError.message}`);
     }
 
-    // Update project
-    const { error: updateError } = await supabase
-      .from('music_projects')
-      .update({
-        status: 'completed',
-        output_audio_id: generatedAudio.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', projectId);
-
-    if (updateError) {
-      throw new Error(`Failed to update project: ${updateError.message}`);
-    }
-
     return new Response(
       JSON.stringify({
         success: true,
-        projectId,
         outputAudioId: generatedAudio.id,
         audioUrl: publicUrl,
+        fileName: generatedAudio.original_filename,
         duration: 60,
         analysis: musicAnalysis,
         serviceName: 'Stable Audio 2.0',
@@ -254,8 +269,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         error: error.message,
-        success: false,
-        recommendation: 'Please ensure you have a valid Stable Audio API key and try again. High-quality music generation requires professional AI services.'
+        success: false
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
