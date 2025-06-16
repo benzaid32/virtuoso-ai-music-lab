@@ -1,7 +1,8 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload, Play, Pause, Download, Music } from 'lucide-react';
+import { Upload, Download, Music } from 'lucide-react';
 import { AudioProcessor, type AudioAnalysis, type WaveformData } from '@/lib/audio/AudioProcessor';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -15,7 +16,6 @@ interface AudioFile {
   name: string;
   url: string;
   waveform: WaveformData;
-  file?: File;
 }
 
 type AppState = 'import' | 'analyzing' | 'analyzed' | 'generating' | 'completed';
@@ -52,7 +52,7 @@ export default function App() {
     setProgress(10);
 
     try {
-      // Process audio file locally for analysis
+      // Process audio file locally for analysis only
       const { analysis: audioAnalysis, waveform } = await AudioProcessor.processAudioFile(file);
       setProgress(100);
 
@@ -61,9 +61,8 @@ export default function App() {
         id: `temp-${Date.now()}`,
         name: file.name,
         url: URL.createObjectURL(file),
-        waveform,
-        file // Store the actual file for generation
-      } as any);
+        waveform
+      });
       setState('analyzed');
 
     } catch (err: any) {
@@ -75,28 +74,18 @@ export default function App() {
   };
 
   const handleGenerate = async () => {
-    if (!sourceFile || !analysis || !sourceFile.file) return;
+    if (!analysis) return;
 
     setState('generating');
     setError(null);
     setProgress(10);
 
     try {
-      // Convert file to base64 for edge function
-      const fileBuffer = await sourceFile.file.arrayBuffer();
-      const base64File = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
-      
       setProgress(30);
 
-      // Call Virtuoso AI Composer edge function with everything
+      // Call simplified edge function with just the analysis data
       const { data, error } = await supabase.functions.invoke('virtuoso-ai-composer', {
         body: {
-          audioFile: {
-            name: sourceFile.name,
-            data: base64File,
-            mimeType: sourceFile.file.type,
-            size: sourceFile.file.size
-          },
           mode,
           instrument: mode === 'solo' ? instrument : null,
           group: mode === 'group' ? group : null,
@@ -110,7 +99,7 @@ export default function App() {
       setProgress(90);
 
       setGeneratedFile({
-        id: data.outputAudioId || 'generated',
+        id: 'generated',
         name: data.fileName || `Virtuoso AI ${mode} - ${mode === 'solo' ? instrument : group}.wav`,
         url: data.audioUrl,
         waveform: { peaks: [], duration: data.duration || 60 }
@@ -120,7 +109,6 @@ export default function App() {
       setState('completed');
 
     } catch (err: any) {
-      // Professional error messaging for high-quality focus
       const errorMessage = err.message?.includes('Stable Audio') 
         ? 'High-quality music generation is temporarily unavailable. Please try again in a few minutes.'
         : err.message?.includes('API key') 

@@ -1,5 +1,5 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -121,61 +121,16 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     const stableAudioApiKey = Deno.env.get('STABLE_AUDIO_API_KEY');
     
     if (!stableAudioApiKey) {
       throw new Error('STABLE_AUDIO_API_KEY environment variable is required for high-quality music generation');
     }
 
-    const { audioFile, mode, instrument, group, musicAnalysis } = await req.json();
+    const { mode, instrument, group, musicAnalysis } = await req.json();
 
     console.log('🎵 Professional music generation');
     console.log('🎼 Music analysis:', musicAnalysis);
-
-    // Upload input audio file to storage
-    const timestamp = Date.now();
-    const fileName = `${timestamp}_${audioFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    const filePath = `anonymous/${fileName}`;
-
-    // Convert base64 back to buffer
-    const inputAudioBuffer = Uint8Array.from(atob(audioFile.data), c => c.charCodeAt(0));
-
-    const { error: inputUploadError } = await supabase.storage
-      .from('audio-files')
-      .upload(filePath, inputAudioBuffer, {
-        contentType: audioFile.mimeType,
-        upsert: false
-      });
-
-    if (inputUploadError) {
-      throw new Error(`Failed to upload input audio: ${inputUploadError.message}`);
-    }
-
-    // Create input audio record
-    const { data: inputAudio, error: audioError } = await supabase
-      .from('audio_files')
-      .insert({
-        user_id: 'anonymous',
-        filename: fileName,
-        original_filename: audioFile.name,
-        file_path: filePath,
-        file_size: audioFile.size,
-        mime_type: audioFile.mimeType,
-        file_type: 'uploaded',
-        duration_seconds: musicAnalysis.duration || 0,
-        waveform_data: []
-      })
-      .select()
-      .single();
-
-    if (audioError) {
-      throw new Error(`Failed to create audio record: ${audioError.message}`);
-    }
 
     // Create professional prompt based on real musical analysis
     const enhancedPrompt = createProfessionalPrompt(musicAnalysis, mode, instrument, group);
@@ -197,60 +152,13 @@ serve(async (req) => {
     console.log('✅ High-quality music generated successfully');
     console.log('🔗 Audio URL:', audioUrl);
 
-    // Download and store the generated audio
-    const audioResponse = await fetch(audioUrl);
-    if (!audioResponse.ok) {
-      throw new Error('Failed to download generated audio');
-    }
-
-    const audioBlob = await audioResponse.blob();
-    const audioBuffer = await audioBlob.arrayBuffer();
-
     const generatedFileName = `virtuoso_${mode}_${instrument || group}_${musicAnalysis.key}_${Date.now()}.wav`;
-    const generatedFilePath = `${inputAudio.user_id}/${generatedFileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('audio-files')
-      .upload(generatedFilePath, audioBuffer, {
-        contentType: 'audio/wav',
-        upsert: false
-      });
-
-    if (uploadError) {
-      throw new Error(`Failed to upload: ${uploadError.message}`);
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('audio-files')
-      .getPublicUrl(generatedFilePath);
-
-    // Create database record
-    const { data: generatedAudio, error: generatedError } = await supabase
-      .from('audio_files')
-      .insert({
-        user_id: inputAudio.user_id,
-        filename: generatedFileName,
-        original_filename: `Virtuoso AI ${mode} - ${instrument || group} (${musicAnalysis.key} ${musicAnalysis.mode}).wav`,
-        file_path: generatedFilePath,
-        file_size: audioBuffer.byteLength,
-        mime_type: 'audio/wav',
-        file_type: 'generated',
-        duration_seconds: 60,
-        waveform_data: []
-      })
-      .select()
-      .single();
-
-    if (generatedError) {
-      throw new Error(`Failed to create record: ${generatedError.message}`);
-    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        outputAudioId: generatedAudio.id,
-        audioUrl: publicUrl,
-        fileName: generatedAudio.original_filename,
+        audioUrl: audioUrl,
+        fileName: generatedFileName,
         duration: 60,
         analysis: musicAnalysis,
         serviceName: 'Stable Audio 2.0',
