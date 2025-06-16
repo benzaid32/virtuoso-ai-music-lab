@@ -1,16 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import React, { useState } from 'react';
 import { useAudioUpload } from '../hooks/useAudioUpload';
 import { useMusicAnalysis } from '../hooks/useMusicAnalysis';
 import { useStableAudio } from '../hooks/useStableAudio';
-import AuthForm from '../components/AuthForm';
 import ImportScreen from '../components/ImportScreen';
 import ProcessingScreen from '../components/ProcessingScreen';
 import ExportScreen from '../components/ExportScreen';
 import MusicAnalysisDisplay from '../components/MusicAnalysisDisplay';
-import { Button } from '@/components/ui/button';
-import { LogOut, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export type Instrument = 'saxophone' | 'harmonica' | 'steelpan' | 'electric-guitar';
@@ -25,7 +21,6 @@ export interface AudioFile {
 }
 
 const Index = () => {
-  const { user, loading, signOut } = useAuth();
   const { uploadAudioFile, uploading } = useAudioUpload();
   const { analyzeAudio, analyzing, analysis, setAnalysis } = useMusicAnalysis();
   const { generateWithStableAudio, generating, progress } = useStableAudio();
@@ -115,22 +110,6 @@ const Index = () => {
     setUploadedAudioFile(null);
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-studio-dark via-studio-medium to-studio-dark flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthForm onSuccess={() => {}} />;
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-studio-dark via-studio-medium to-studio-dark text-warm-white relative overflow-hidden">
       {/* Background ambient elements */}
@@ -138,30 +117,12 @@ const Index = () => {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(255,193,7,0.05),transparent_70%)]" />
       
       <div className="relative z-10 container mx-auto px-6 py-8">
-        {/* Header with user info */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="text-center flex-1">
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-400 bg-clip-text text-transparent mb-2">
-              Virtuoso.ai
-            </h1>
-            <p className="text-xl text-gray-300">AI Music Analysis & Generation</p>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 text-gray-300">
-              <User className="w-5 h-5" />
-              <span>{user.email}</span>
-            </div>
-            <Button 
-              onClick={handleSignOut}
-              variant="outline"
-              size="sm"
-              className="border-gray-600 text-gray-300 hover:bg-gray-800"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-400 bg-clip-text text-transparent mb-2">
+            Virtuoso.ai
+          </h1>
+          <p className="text-xl text-gray-300">AI Music Analysis & Generation</p>
         </div>
 
         {/* Main Content Area */}
@@ -192,13 +153,13 @@ const Index = () => {
                 
                 {analysis && !analyzing && (
                   <div className="text-center">
-                    <Button
+                    <button
                       onClick={handleStartGeneration}
-                      className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-3 text-lg"
+                      className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-3 text-lg rounded-lg"
                       disabled={generating}
                     >
                       Generate AI Music
-                    </Button>
+                    </button>
                     <p className="text-sm text-gray-400 mt-2">
                       This will create new music matching your audio's key, tempo, and energy
                     </p>
@@ -226,7 +187,7 @@ const Index = () => {
             )}
           </div>
 
-          {/* Right Panel - Analysis Summary or 3D Visualization */}
+          {/* Right Panel - Analysis Summary */}
           <div className="audio-panel rounded-3xl p-8 min-h-[400px] glow-blue">
             {analysis ? (
               <div className="space-y-6">
