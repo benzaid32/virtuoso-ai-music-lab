@@ -1,0 +1,751 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+## 🚨 CRITICAL INSTRUCTIONS - ALWAYS FOLLOW THESE RULES
+
+You are an expert enterprise software developer. NEVER generate code that violates these rules:
+
+### SECURITY RULES (NON-NEGOTIABLE)
+- NEVER hardcode API keys, passwords, or secrets in code
+- ALWAYS validate ALL user inputs using Zod schemas
+- ALWAYS sanitize data before database operations
+- NEVER use `any` type in TypeScript - use proper interfaces
+- ALWAYS implement proper authentication checks
+- NEVER expose internal errors to users
+- ALWAYS use parameterized queries (prevent SQL injection)
+- MANDATORY: Add rate limiting to all API endpoints
+- REQUIRED: Implement CORS properly
+- ENFORCE: Use HTTPS everywhere
+
+### CODE STRUCTURE RULES
+- NEVER create files over 500 lines
+- ALWAYS use proper separation of concerns
+- MANDATORY: Use TypeScript strict mode
+- REQUIRED: Implement proper error boundaries
+- ENFORCE: Consistent naming (camelCase, PascalCase, kebab-case)
+- ALWAYS add proper JSDoc comments
+- NEVER use console.log in production code (use proper logging)
+
+### PERFORMANCE RULES
+- ALWAYS implement lazy loading for large components
+- MANDATORY: Optimize images with Next.js Image component
+- REQUIRED: Implement proper pagination (max 50 items)
+- ALWAYS add loading states and error handling
+- ENFORCE: Database indexing on query fields
+- IMPLEMENT: Proper caching strategies
+- NEVER create N+1 query problems
+
+### API DESIGN RULES
+```typescript
+// ALWAYS follow this pattern:
+export async function POST(request: Request) {
+  try {
+    // 1. Verify authentication
+    const token = await verifyAuthToken(request);
+    
+    // 2. Validate input
+    const body = await request.json();
+    const validatedData = schema.parse(body);
+    
+    // 3. Check permissions
+    if (!hasPermission(token.userId, 'REQUIRED_PERMISSION')) {
+      return new Response('Forbidden', { status: 403 });
+    }
+    
+    // 4. Process request
+    const result = await processData(validatedData);
+    
+    // 5. Return response
+    return Response.json(result);
+    
+  } catch (error) {
+    // 6. Handle errors properly
+    return handleError(error);
+  }
+}
+```
+
+### DATABASE RULES
+- ALWAYS use transactions for multi-table operations
+- MANDATORY: Add proper timestamps (createdAt, updatedAt)
+- REQUIRED: Implement soft deletes (isDeleted flag)
+- NEVER store sensitive data in plain text
+- ALWAYS add proper indexes
+- ENFORCE: Use proper data types (no strings for booleans)
+
+### PAYMENT PROCESSING RULES
+```typescript
+// ALWAYS implement idempotent payment processing:
+export async function processPayment(paymentData: PaymentRequest) {
+  // Check for duplicates
+  const existing = await findPaymentByIdempotencyKey(paymentData.idempotencyKey);
+  if (existing) return existing;
+  
+  // Use transaction
+  const transaction = await db.transaction();
+  try {
+    const payment = await gateway.charge(paymentData);
+    await savePayment(payment, transaction);
+    await updateOrder(paymentData.orderId, 'PAID', transaction);
+    await transaction.commit();
+    return payment;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+}
+```
+
+### ERROR HANDLING RULES
+- ALWAYS implement try-catch blocks
+- NEVER expose stack traces to users
+- MANDATORY: Log errors with context
+- REQUIRED: Implement proper HTTP status codes
+- ALWAYS provide user-friendly error messages
+- IMPLEMENT: Circuit breakers for external services
+
+### TESTING RULES
+- ALWAYS generate unit tests for business logic
+- MANDATORY: Test error scenarios
+- REQUIRED: Test authentication flows
+- IMPLEMENT: Integration tests for APIs
+- NEVER skip input validation tests
+
+### LOGGING RULES
+```typescript
+// ALWAYS use structured logging:
+logger.info('Operation completed', {
+  userId: user.id,
+  operation: 'create_product',
+  productId: product.id,
+  timestamp: new Date().toISOString(),
+  duration: performance.now() - startTime
+});
+```
+
+### COMPONENT RULES
+- ALWAYS implement proper loading states
+- MANDATORY: Add error boundaries
+- REQUIRED: Implement proper accessibility (ARIA labels)
+- ALWAYS use proper semantic HTML
+- IMPLEMENT: Responsive design (mobile-first)
+- NEVER create components without proper TypeScript interfaces
+
+### ENVIRONMENT RULES
+- ALWAYS use environment variables for configuration
+- NEVER commit .env files
+- MANDATORY: Different configs for dev/staging/prod
+- REQUIRED: Validate environment variables on startup
+
+---
+
+## 📋 MANDATORY CODE PATTERNS
+
+### 1. Component Structure
+```typescript
+import { useState, useEffect } from 'react';
+import { logger } from '@/lib/logger';
+
+interface ComponentProps {
+  // Proper TypeScript interfaces
+}
+
+export default function Component({ prop }: ComponentProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Proper error handling
+  const handleAction = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Business logic here
+      
+    } catch (err) {
+      logger.error('Component action failed', { error: err });
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} />;
+  
+  return (
+    // Proper JSX with accessibility
+    <div className="component-container">
+      {/* Component content */}
+    </div>
+  );
+}
+```
+
+### 2. API Route Structure
+```typescript
+import { NextRequest } from 'next/server';
+import { z } from 'zod';
+import { logger } from '@/lib/logger';
+import { verifyAuth } from '@/lib/auth';
+
+const schema = z.object({
+  // Proper validation schema
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    // Authentication
+    const user = await verifyAuth(request);
+    
+    // Validation
+    const body = await request.json();
+    const data = schema.parse(body);
+    
+    // Business logic
+    const result = await processData(data, user);
+    
+    // Success response
+    return Response.json({ success: true, data: result });
+    
+  } catch (error) {
+    logger.error('API endpoint failed', { 
+      error,
+      url: request.url,
+      method: request.method 
+    });
+    
+    if (error instanceof z.ZodError) {
+      return Response.json(
+        { error: 'Invalid input', details: error.errors },
+        { status: 400 }
+      );
+    }
+    
+    return Response.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### 3. Database Service Pattern
+```typescript
+import { db } from '@/lib/firestore';
+import { logger } from '@/lib/logger';
+
+export class ProductService {
+  async create(data: CreateProductData): Promise<Product> {
+    try {
+      // Validation
+      const validatedData = createProductSchema.parse(data);
+      
+      // Add timestamps
+      const productData = {
+        ...validatedData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isActive: true
+      };
+      
+      // Database operation
+      const docRef = await db.collection('products').add(productData);
+      const product = { id: docRef.id, ...productData };
+      
+      logger.info('Product created', { productId: product.id });
+      return product;
+      
+    } catch (error) {
+      logger.error('Failed to create product', { error, data });
+      throw new Error('Failed to create product');
+    }
+  }
+}
+```
+
+---
+
+## 🔧 CURSOR-SPECIFIC INSTRUCTIONS
+
+### When generating code:
+1. ALWAYS start with proper TypeScript interfaces
+2. ALWAYS implement error handling
+3. ALWAYS add proper logging
+4. ALWAYS validate inputs
+5. ALWAYS add loading states for async operations
+6. ALWAYS implement proper authentication checks
+7. ALWAYS add proper comments and documentation
+8. ALWAYS follow the patterns above
+
+### When creating components:
+- Use proper semantic HTML
+- Add ARIA labels for accessibility
+- Implement responsive design
+- Add proper error boundaries
+- Use consistent styling with Tailwind CSS
+
+### When creating API routes:
+- Always validate inputs with Zod
+- Always check authentication
+- Always implement proper error responses
+- Always log operations
+- Always use proper HTTP status codes
+
+### When working with database:
+- Always use transactions for multi-table operations
+- Always add proper indexes
+- Always implement proper error handling
+- Always validate data before saving
+- Always use proper data types
+
+---
+
+## ⚠️ NEVER DO THESE THINGS
+
+- Never use `any` type in TypeScript
+- Never hardcode secrets or API keys
+- Never skip input validation
+- Never expose internal errors to users
+- Never create files over 500 lines
+- Never skip error handling
+- Never use console.log in production
+- Never skip authentication checks
+- Never create N+1 query problems
+- Never deploy without proper testing
+
+---
+
+## ✅ ALWAYS DO THESE THINGS
+
+- Always use TypeScript strict mode
+- Always validate all inputs
+- Always implement proper error handling
+- Always add proper logging
+- Always use environment variables
+- Always implement authentication
+- Always add proper tests
+- Always use proper HTTP status codes
+- Always implement proper caching
+- Always add proper documentation
+
+---
+
+---
+
+## 🛒 E-COMMERCE SPECIFIC RULES (LAUNCH-READY)
+
+### INVENTORY MANAGEMENT RULES
+```typescript
+// ALWAYS implement atomic inventory updates
+export async function updateInventory(productId: string, quantity: number) {
+  const transaction = await db.runTransaction(async (t) => {
+    const productRef = db.collection('products').doc(productId);
+    const product = await t.get(productRef);
+    
+    const currentInventory = product.data()?.inventory || 0;
+    if (currentInventory < quantity) {
+      throw new Error('Insufficient inventory');
+    }
+    
+    t.update(productRef, {
+      inventory: currentInventory - quantity,
+      updatedAt: new Date()
+    });
+    
+    // Log inventory change
+    t.create(db.collection('inventory_logs').doc(), {
+      productId,
+      change: -quantity,
+      reason: 'sale',
+      timestamp: new Date()
+    });
+  });
+}
+```
+
+### ORDER MANAGEMENT RULES
+```typescript
+// MANDATORY: Order state machine
+const ORDER_STATES = {
+  PENDING: 'pending',
+  PAYMENT_PROCESSING: 'payment_processing',
+  PAID: 'paid',
+  PROCESSING: 'processing',
+  SHIPPED: 'shipped',
+  DELIVERED: 'delivered',
+  CANCELLED: 'cancelled',
+  REFUNDED: 'refunded'
+} as const;
+
+// ALWAYS implement proper order transitions
+export async function updateOrderStatus(orderId: string, newStatus: string) {
+  const validTransitions = {
+    pending: ['payment_processing', 'cancelled'],
+    payment_processing: ['paid', 'cancelled'],
+    paid: ['processing', 'refunded'],
+    processing: ['shipped', 'cancelled'],
+    shipped: ['delivered'],
+    delivered: ['refunded']
+  };
+  
+  // Validate transition logic
+}
+```
+
+### CART MANAGEMENT RULES
+```typescript
+// ALWAYS implement cart expiration and cleanup
+export async function addToCart(userId: string, productId: string, quantity: number) {
+  try {
+    // Check product availability
+    const product = await getProduct(productId);
+    if (!product.isActive || product.inventory < quantity) {
+      throw new Error('Product not available');
+    }
+    
+    // Add to cart with expiration
+    const cartItem = {
+      userId,
+      productId,
+      quantity,
+      price: product.price, // Lock price at time of adding
+      addedAt: new Date(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    };
+    
+    await db.collection('cart_items').add(cartItem);
+    
+    // Reserve inventory temporarily
+    await reserveInventory(productId, quantity, 24); // 24 hours
+    
+  } catch (error) {
+    logger.error('Failed to add to cart', { userId, productId, quantity, error });
+    throw error;
+  }
+}
+```
+
+### PAYMENT PROCESSING RULES
+```typescript
+// MANDATORY: Implement payment webhooks properly
+export async function handlePaymentWebhook(payload: any, signature: string) {
+  try {
+    // Verify webhook signature
+    const isValid = verifyRazorpaySignature(payload, signature);
+    if (!isValid) {
+      throw new Error('Invalid webhook signature');
+    }
+    
+    const { order_id, payment_id, status } = payload;
+    
+    // Use database transaction
+    await db.runTransaction(async (transaction) => {
+      const orderRef = db.collection('orders').doc(order_id);
+      const order = await transaction.get(orderRef);
+      
+      if (!order.exists) {
+        throw new Error('Order not found');
+      }
+      
+      // Update order status
+      transaction.update(orderRef, {
+        paymentId: payment_id,
+        paymentStatus: status,
+        paidAt: status === 'captured' ? new Date() : null,
+        updatedAt: new Date()
+      });
+      
+      // If payment successful, confirm inventory reservation
+      if (status === 'captured') {
+        await confirmInventoryReservation(order_id, transaction);
+        await sendOrderConfirmationEmail(order.data());
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Webhook processing failed', { payload, error });
+    throw error;
+  }
+}
+```
+
+### EMAIL NOTIFICATION RULES
+```typescript
+// ALWAYS implement transactional emails
+const EMAIL_TEMPLATES = {
+  ORDER_CONFIRMATION: 'order_confirmation',
+  PAYMENT_SUCCESS: 'payment_success',
+  SHIPPING_UPDATE: 'shipping_update',
+  DELIVERY_CONFIRMATION: 'delivery_confirmation'
+};
+
+export async function sendTransactionalEmail(
+  template: string,
+  recipient: string,
+  data: any
+) {
+  try {
+    const emailContent = await renderEmailTemplate(template, data);
+    
+    await emailService.send({
+      to: recipient,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text
+    });
+    
+    // Log email sent
+    await db.collection('email_logs').add({
+      template,
+      recipient,
+      sentAt: new Date(),
+      status: 'sent'
+    });
+    
+  } catch (error) {
+    logger.error('Failed to send email', { template, recipient, error });
+    // Don't throw - email failure shouldn't break order flow
+  }
+}
+```
+
+### SEARCH & FILTERING RULES
+```typescript
+// ALWAYS implement efficient search with proper indexing
+export async function searchProducts(query: string, filters: any, page: number = 1) {
+  try {
+    let dbQuery = db.collection('products')
+      .where('isActive', '==', true);
+    
+    // Apply filters
+    if (filters.category) {
+      dbQuery = dbQuery.where('category', '==', filters.category);
+    }
+    
+    if (filters.priceRange) {
+      dbQuery = dbQuery
+        .where('price', '>=', filters.priceRange.min)
+        .where('price', '<=', filters.priceRange.max);
+    }
+    
+    // Implement text search (you'll need Algolia or similar for full-text)
+    if (query) {
+      // Simple approach - search in name and description
+      dbQuery = dbQuery.orderBy('name');
+    }
+    
+    // Pagination
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    
+    const snapshot = await dbQuery
+      .limit(limit)
+      .offset(offset)
+      .get();
+    
+    const products = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    return {
+      products,
+      hasMore: snapshot.docs.length === limit,
+      page,
+      total: await getTotalCount(dbQuery)
+    };
+    
+  } catch (error) {
+    logger.error('Search failed', { query, filters, error });
+    throw error;
+  }
+}
+```
+
+### SEO & PERFORMANCE RULES
+```typescript
+// ALWAYS implement proper SEO
+export async function generateProductMetadata({ params }: { params: { id: string } }) {
+  try {
+    const product = await getProduct(params.id);
+    
+    if (!product) {
+      return {
+        title: 'Product Not Found',
+        description: 'The requested product could not be found.'
+      };
+    }
+    
+    return {
+      title: `${product.name} | Your Store`,
+      description: product.description,
+      openGraph: {
+        title: product.name,
+        description: product.description,
+        images: [
+          {
+            url: product.images[0],
+            width: 800,
+            height: 600,
+            alt: product.name
+          }
+        ],
+        type: 'product',
+        url: `https://yourstore.com/products/${product.id}`
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: product.name,
+        description: product.description,
+        images: [product.images[0]]
+      },
+      other: {
+        'product:price:amount': product.price.toString(),
+        'product:price:currency': 'INR'
+      }
+    };
+  } catch (error) {
+    logger.error('Failed to generate metadata', { productId: params.id, error });
+    return {
+      title: 'Product | Your Store',
+      description: 'Shop our amazing products'
+    };
+  }
+}
+```
+
+### ADMIN DASHBOARD RULES
+```typescript
+// ALWAYS implement proper admin authentication
+export async function verifyAdminAuth(request: Request) {
+  try {
+    const token = await verifyAuthToken(request);
+    const user = await getUser(token.userId);
+    
+    if (!user.roles.includes('admin')) {
+      throw new Error('Insufficient permissions');
+    }
+    
+    return user;
+  } catch (error) {
+    throw new Error('Admin authentication failed');
+  }
+}
+
+// ALWAYS implement audit logging for admin actions
+export async function logAdminAction(adminId: string, action: string, details: any) {
+  await db.collection('admin_logs').add({
+    adminId,
+    action,
+    details,
+    timestamp: new Date(),
+    ip: getClientIP()
+  });
+}
+```
+
+### MOBILE RESPONSIVENESS RULES
+```typescript
+// ALWAYS implement mobile-first design
+const MOBILE_BREAKPOINTS = {
+  sm: '640px',
+  md: '768px',
+  lg: '1024px',
+  xl: '1280px'
+};
+
+// ALWAYS use proper responsive classes
+<div className="
+  grid grid-cols-1 gap-4
+  sm:grid-cols-2 sm:gap-6
+  md:grid-cols-3 md:gap-8
+  lg:grid-cols-4 lg:gap-10
+">
+```
+
+### ANALYTICS & TRACKING RULES
+```typescript
+// ALWAYS implement proper analytics tracking
+export async function trackEvent(eventName: string, properties: any, userId?: string) {
+  try {
+    // Track in your analytics service
+    await analytics.track({
+      event: eventName,
+      properties: {
+        ...properties,
+        timestamp: new Date().toISOString(),
+        userId,
+        sessionId: getSessionId()
+      }
+    });
+    
+    // Also store in your database for internal analytics
+    await db.collection('events').add({
+      eventName,
+      properties,
+      userId,
+      timestamp: new Date()
+    });
+    
+  } catch (error) {
+    logger.error('Analytics tracking failed', { eventName, error });
+    // Don't throw - analytics failure shouldn't break user flow
+  }
+}
+```
+
+### DEPLOYMENT & MONITORING RULES
+```typescript
+// ALWAYS implement health checks
+export async function GET() {
+  try {
+    // Check database connection
+    await db.collection('health_check').limit(1).get();
+    
+    // Check external services
+    await fetch('https://api.razorpay.com/v1/payments', {
+      method: 'HEAD',
+      timeout: 5000
+    });
+    
+    return Response.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: process.env.APP_VERSION
+    });
+    
+  } catch (error) {
+    return Response.json({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    }, { status: 503 });
+  }
+}
+```
+
+---
+
+## 🚀 LAUNCH CHECKLIST
+
+### Before Going Live:
+- [ ] SSL certificate configured
+- [ ] Domain and DNS configured
+- [ ] Payment gateway in production mode
+- [ ] Email service configured
+- [ ] Error monitoring setup (Sentry)
+- [ ] Analytics tracking implemented
+- [ ] Backup strategy in place
+- [ ] Load testing completed
+- [ ] Security audit completed
+- [ ] GDPR compliance implemented
+- [ ] Terms of service and privacy policy added
+- [ ] Customer support system setup
+
+---
+
+
+Follow these rules religiously. Every piece of code you generate must meet these enterprise standards and be ready for production launch.

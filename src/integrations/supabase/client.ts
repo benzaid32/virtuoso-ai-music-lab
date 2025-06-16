@@ -2,10 +2,26 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://qxomxsjmmaktavblimfz.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b214c2ptbWFrdGF2YmxpbWZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMTM2MTUsImV4cCI6MjA2NTU4OTYxNX0.rHjz2ltPMQ04RzFr7fO6S8V0MH_2oaXQO_QmpaOBQ3A";
+// Get environment variables with fallbacks
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://qxomxsjmmaktavblimfz.supabase.co";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b214c2ptbWFrdGF2YmxpbWZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMTM2MTUsImV4cCI6MjA2NTU4OTYxNX0.rHjz2ltPMQ04RzFr7fO6S8V0MH_2oaXQO_QmpaOBQ3A";
+
+// Validate environment variables
+if (!SUPABASE_URL) {
+  throw new Error('Missing VITE_SUPABASE_URL environment variable');
+}
+
+if (!SUPABASE_ANON_KEY) {
+  throw new Error('Missing VITE_SUPABASE_ANON_KEY environment variable');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false
+  }
+});

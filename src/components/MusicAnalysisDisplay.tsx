@@ -65,7 +65,7 @@ const MusicAnalysisDisplay: React.FC<MusicAnalysisDisplayProps> = ({
           <Zap className="w-4 h-4 text-green-400" />
           <div>
             <p className="text-gray-400">Energy</p>
-            <p className="text-white font-medium">{Math.round(analysis.energy)}%</p>
+                            <p className="text-white font-medium">{Math.round(analysis.energy).toString()}%</p>
           </div>
         </div>
       </div>
