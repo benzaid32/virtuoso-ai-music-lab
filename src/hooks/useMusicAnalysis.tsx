@@ -1,5 +1,7 @@
 
 import { useState, useCallback } from 'react';
+import { uploadAudio, analyzeAudio, AudioServiceError } from '../lib/api/audio-service';
+import { initializeStorage } from '../lib/supabase';
 
 export interface MusicAnalysis {
   key: string;
@@ -10,61 +12,79 @@ export interface MusicAnalysis {
   duration: number;
 }
 
+// Initialize storage on app startup
+initializeStorage().catch(console.error);
+
 export const useMusicAnalysis = () => {
   const [analysis, setAnalysis] = useState<MusicAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const analyzeAudio = useCallback(async (audioFile: File): Promise<MusicAnalysis> => {
+  const processAudioAnalysis = useCallback(async (audioFile: File): Promise<MusicAnalysis> => {
     setIsAnalyzing(true);
     setError(null);
 
     try {
-      // Create a simple audio analysis using Web Audio API
+      console.log('Starting professional audio analysis process');
+      
+      // First get audio duration for our analysis result
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const arrayBuffer = await audioFile.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-      // Basic analysis - in a real app, you'd use more sophisticated algorithms
       const duration = audioBuffer.duration;
-      const sampleRate = audioBuffer.sampleRate;
-      const channelData = audioBuffer.getChannelData(0);
-
-      // Simple tempo estimation (very basic)
-      const tempo = Math.floor(Math.random() * 60) + 60; // 60-120 BPM range
-
-      // Simple energy calculation
-      let energy = 0;
-      for (let i = 0; i < channelData.length; i += 1000) {
-        energy += Math.abs(channelData[i]);
-      }
-      energy = Math.min(100, (energy / (channelData.length / 1000)) * 10000);
-
-      // Simple key detection (random for demo)
-      const keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      const modes = ['major', 'minor'] as const;
       
-      const detectedKey = keys[Math.floor(Math.random() * keys.length)];
-      const detectedMode = modes[Math.floor(Math.random() * modes.length)];
-
-      // Confidence based on energy and duration
-      const confidence = Math.min(1, (energy / 100) * 0.5 + (Math.min(duration, 300) / 300) * 0.5);
-
+      // Step 1: Upload audio using our enterprise service
+      console.log('Uploading audio for analysis...');
+      const audioUrl = await uploadAudio({ file: audioFile });
+      console.log('Audio uploaded successfully', { audioUrl });
+      
+      // Step 2: Perform professional audio analysis
+      console.log('Analyzing audio with professional ACRCloud service...');
+      const backendAnalysis = await analyzeAudio(audioUrl);
+      console.log('Professional analysis complete', backendAnalysis);
+      
+      // Step 3: Format result for UI consumption
       const analysisResult: MusicAnalysis = {
-        key: detectedKey,
-        tempo: tempo,
-        energy: Math.round(energy),
-        mode: detectedMode,
-        confidence: Math.round(confidence * 100) / 100,
+        key: backendAnalysis.key,
+        tempo: backendAnalysis.tempo,
+        energy: typeof backendAnalysis.energy === 'number' ? 
+          (backendAnalysis.energy <= 1 ? Math.round(backendAnalysis.energy * 100) : backendAnalysis.energy) : 
+          50, // Handles both 0-1 and 0-100 scale formats
+        mode: backendAnalysis.mode,
+        confidence: backendAnalysis.confidence,
         duration: Math.round(duration)
       };
-
+      
+      console.log('Analysis complete and processed:', analysisResult);
       setAnalysis(analysisResult);
       return analysisResult;
 
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to analyze audio file';
+      // Enterprise-grade error handling with detailed logging and user-friendly messages
+      console.error('Audio analysis failed:', err);
+      
+      let errorMessage = 'Failed to analyze audio';
+      let errorCode = 'UNKNOWN_ERROR';
+      
+      if (err instanceof AudioServiceError) {
+        errorMessage = err.message;
+        errorCode = err.code;
+        
+        // Send telemetry for monitoring
+        const telemetryData = {
+          errorCode: err.code,
+          errorMessage: err.message,
+          timestamp: new Date().toISOString(),
+          // Don't log PII or sensitive data
+        };
+        
+        console.info('Error telemetry:', telemetryData);
+      } 
+      
+      // Set user-facing error
       setError(errorMessage);
+      
+      // Re-throw for upstream handling if needed
       throw new Error(errorMessage);
     } finally {
       setIsAnalyzing(false);
@@ -75,7 +95,9 @@ export const useMusicAnalysis = () => {
     analysis,
     isAnalyzing,
     error,
-    analyzeAudio,
+    // Rename the function but keep the original name as an alias for backward compatibility
+    analyzeAudio: processAudioAnalysis,
+    processAudioAnalysis,
     setAnalysis,
     setError
   };

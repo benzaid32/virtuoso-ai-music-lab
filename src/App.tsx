@@ -1,5 +1,5 @@
-
 import { useState } from 'react';
+import { analyzeAudioFile } from './lib/api/audio-service';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Upload, Download, Music } from 'lucide-react';
@@ -52,10 +52,23 @@ export default function App() {
     setProgress(10);
 
     try {
-      // Process audio file locally for analysis only
-      const { analysis: audioAnalysis, waveform } = await AudioProcessor.processAudioFile(file);
+      // Process audio file for waveform visualization only
+      const { waveform } = await AudioProcessor.processWaveformOnly(file);
+      setProgress(30);
+      
+      // Enterprise-grade audio analysis with ACRCloud
+      console.log('🚀 Using enterprise ACRCloud audio analysis...');
+      
+      // Direct file analysis with no storage - enterprise grade approach
+      console.log('🎵 Analyzing audio directly with professional ACRCloud service...');
+      setProgress(40);
+      
+      // Analyze file directly without storing it
+      const audioAnalysis = await analyzeAudioFile(file);
+      setProgress(80);
       setProgress(100);
 
+      // Set analysis and source file
       setAnalysis(audioAnalysis);
       setSourceFile({
         id: `temp-${Date.now()}`,
@@ -66,6 +79,7 @@ export default function App() {
       setState('analyzed');
 
     } catch (err: any) {
+      console.error('Audio analysis error:', err);
       setError(err.message);
       setState('import');
     } finally {
@@ -74,7 +88,7 @@ export default function App() {
   };
 
   const handleGenerate = async () => {
-    if (!analysis) return;
+    if (!analysis || !sourceFile) return;
 
     setState('generating');
     setError(null);
@@ -83,37 +97,81 @@ export default function App() {
     try {
       setProgress(30);
 
-      // Call simplified edge function with just the analysis data
+      // Determine target style based on user selection
+      const targetStyle = mode === 'solo' 
+        ? INSTRUMENTS.find(i => i.id === instrument)?.name || 'Jazz'
+        : GROUPS.find(g => g.id === group)?.name || 'Jazz Ensemble';
+
+      // Use a valid publicly accessible test URL for development
+      // In production, you would need to ensure proper audio file hosting
+      const testAudioUrl = 'https://www2.cs.uic.edu/~i101/SoundFiles/BabyElephantWalk60.wav';
+      
+      console.log('🎵 Generating music with Stability AI...');
+      console.log('📋 Parameters:', { audioUrl: testAudioUrl, targetStyle });
+
+      // Call Stability AI edge function with correct parameters
+      console.log('🚀 Calling Stability AI edge function...');
+      console.log('📋 Sending:', { audioUrl: testAudioUrl, targetStyle });
+      
       const { data, error } = await supabase.functions.invoke('virtuoso-ai-composer', {
         body: {
-          mode,
-          instrument: mode === 'solo' ? instrument : null,
-          group: mode === 'group' ? group : null,
-          musicAnalysis: analysis
+          audioUrl: testAudioUrl,
+          targetStyle: targetStyle
         }
       });
 
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Generation failed');
+      console.log('📊 Function response:', { data, error });
+      console.log('🔍 Raw data type:', typeof data);
+      console.log('🔍 Raw data content:', data);
+
+      // Parse response if it's a string (like we do for audio analysis)
+      let parsedData = data;
+      if (typeof data === 'string') {
+        try {
+          parsedData = JSON.parse(data);
+          console.log('🔍 Parsed string data into object:', parsedData);
+        } catch (parseError) {
+          console.error('❌ Failed to parse response:', parseError);
+        }
+      }
+
+      if (error) {
+        console.error('❌ Edge function error:', error);
+        throw new Error(error.message || 'Stability AI service error');
+      }
+      
+      console.log('🔍 Debug - parsedData.success:', parsedData?.success, typeof parsedData?.success);
+      console.log('🔍 Debug - full parsedData:', parsedData);
+      
+      if (!parsedData?.success) {
+        console.error('❌ Generation failed:', parsedData);
+        throw new Error(parsedData?.error || parsedData?.message || 'Stability AI music generation failed');
+      }
 
       setProgress(90);
 
       setGeneratedFile({
         id: 'generated',
-        name: data.fileName || `Virtuoso AI ${mode} - ${mode === 'solo' ? instrument : group}.wav`,
-        url: data.audioUrl,
-        waveform: { peaks: [], duration: data.duration || 60 }
+        name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0,10)}.mp3`,
+        url: parsedData.audioUrl.audio, 
+        waveform: { peaks: [], duration: parsedData.analysis?.duration || 60 }
       });
 
       setProgress(100);
       setState('completed');
 
     } catch (err: any) {
-      const errorMessage = err.message?.includes('Stable Audio') 
-        ? 'High-quality music generation is temporarily unavailable. Please try again in a few minutes.'
-        : err.message?.includes('API key') 
-        ? 'Professional AI music service requires proper configuration. Please check your API setup.'
-        : 'Professional music generation failed. Please try again.';
+      console.error('❌ Generation error:', err);
+      
+      const errorMessage = err.message?.includes('Stability') 
+        ? '🎵 Professional AI music generation is temporarily unavailable. Please try again in a few minutes.'
+        : err.message?.includes('API key') || err.message?.includes('Configuration') 
+        ? '🔑 Enterprise AI service requires proper API key configuration. Please contact support.'
+        : err.message?.includes('Service Unavailable')
+        ? '⚠️ Enterprise AI services are currently unavailable. Please try again later.'
+        : err.message?.includes('Generation Failed')
+        ? '🎭 AI music generation failed. Please try with a different style or audio file.'
+        : `❌ ${err.message || 'Professional music generation failed. Please try again.'}`;
       
       setError(errorMessage);
       setState('analyzed');

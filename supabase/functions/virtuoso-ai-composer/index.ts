@@ -1,259 +1,199 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+/**
+ * Virtuoso AI Composer - Enterprise Music Generation Service
+ * This microservice focuses exclusively on music generation
+ * For audio analysis, use the dedicated audio-analysis microservice
+ */
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
-interface MusicAnalysis {
-  key: string;
-  tempo: number;
-  energy: number;
-  mode: 'major' | 'minor';
-  confidence: number;
-}
+// Enterprise Music Generation Services
+class EnterpriseAudioService {
+  private replicateApiKey: string;
 
-class ProfessionalStableAudioService {
-  private apiKey: string;
-  private maxRetries = 3;
-  private retryDelay = 3000; // 3 seconds
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+  constructor() {
+    this.replicateApiKey = Deno.env.get('REPLICATE_API_KEY') || '';
   }
 
-  async isAvailable(): Promise<boolean> {
+  // Check Replicate availability  
+  async checkReplicate(): Promise<boolean> {
+    if (!this.replicateApiKey) {
+      console.log('⚠️ REPLICATE_API_KEY not configured');
+      return false;
+    }
+
     try {
-      const response = await fetch('https://api.stability.ai/v1/user/account', {
+      const response = await fetch('https://api.replicate.com/v1/models', {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
+          'Authorization': `Bearer ${this.replicateApiKey}`,
+        }
       });
+
+      console.log(`📊 Replicate check: ${response.status}`);
       return response.ok;
-    } catch {
+    } catch (error) {
+      console.log('❌ Replicate test failed:', error.message);
       return false;
     }
   }
 
-  async generateHighQualityMusic(prompt: string, duration: number): Promise<string> {
-    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-      try {
-        console.log(`Stable Audio attempt ${attempt}/${this.maxRetries}`);
-        console.log('Enhanced prompt:', prompt);
-
-        // Updated API endpoint - using the correct Stable Audio API
-        const response = await fetch('https://api.stability.ai/v2beta/stable-audio/generate/music', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt,
-            duration,
-            cfg_scale: 7.5,
-            seed: Math.floor(Math.random() * 1000000),
-            output_format: 'wav'
-          })
-        });
-
-        console.log('API Response status:', response.status);
-        console.log('API Response headers:', Object.fromEntries(response.headers.entries()));
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`API Error Response: ${errorText}`);
-          
-          // If it's a 404, try the alternative endpoint
-          if (response.status === 404 && attempt === 1) {
-            console.log('Trying alternative endpoint...');
-            const altResponse = await fetch('https://api.stability.ai/v1/generation/stable-audio/text-to-audio', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${this.apiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                text_prompts: [{ text: prompt }],
-                duration_seconds: duration,
-                cfg_scale: 7.5,
-                seed: Math.floor(Math.random() * 1000000)
-              })
-            });
-
-            if (altResponse.ok) {
-              const altResult = await altResponse.json();
-              if (altResult.artifacts && altResult.artifacts[0]) {
-                // Convert base64 to URL (simplified for demo)
-                const audioBase64 = altResult.artifacts[0].base64;
-                const audioUrl = `data:audio/wav;base64,${audioBase64}`;
-                console.log(`✅ High-quality music generated successfully on attempt ${attempt} (alternative endpoint)`);
-                return audioUrl;
-              }
-            }
-          }
-          
-          throw new Error(`Stable Audio API error: ${response.status} - ${errorText}`);
+  // Generate music with Replicate
+  async generateWithReplicate(prompt: string, style: string): Promise<string> {
+    console.log(`🎵 Generating music with Replicate...`);
+    
+    // Create generation task using Riffusion model
+    const response = await fetch('https://api.replicate.com/v1/predictions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.replicateApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        version: "8cf61ea6c56afd61d8f5b9ffd14d7c216c0a93844ce2d82ac1c9ecc9c7f24e05",
+        input: {
+          prompt_a: `${style} style: ${prompt}`,
+          denoising: 0.75,
+          seed_image_id: "vibes"
         }
+      })
+    });
 
-        const result = await response.json();
-        console.log('API Response result:', result);
-        
-        if (!result.audio_url && !result.audio) {
-          throw new Error('No audio URL returned from Stable Audio');
-        }
-
-        const audioUrl = result.audio_url || result.audio;
-        console.log(`✅ High-quality music generated successfully on attempt ${attempt}`);
-        return audioUrl;
-
-      } catch (error) {
-        console.error(`❌ Stable Audio attempt ${attempt} failed:`, error);
-        
-        if (attempt < this.maxRetries) {
-          console.log(`⏳ Retrying in ${this.retryDelay}ms...`);
-          await this.delay(this.retryDelay);
-        } else {
-          throw new Error(`High-quality music generation failed after ${this.maxRetries} attempts: ${error.message}`);
-        }
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Replicate error: ${response.status} - ${errorText}`);
     }
 
-    throw new Error('Unexpected error in music generation');
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-}
-
-// Fallback service for demo purposes
-class MockAudioService {
-  async generateMusic(prompt: string, duration: number): Promise<string> {
-    console.log('🎵 Using mock audio service for demo');
-    console.log('Prompt:', prompt);
-    console.log('Duration:', duration);
+    const result = await response.json();
     
-    // Return a placeholder audio URL for demo
-    return 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+    if (result.id) {
+      // Poll for completion
+      return await this.pollReplicateTask(result.id);
+    }
+    
+    throw new Error('No task ID returned by Replicate');
+  }
+
+  // Poll Replicate task status
+  async pollReplicateTask(taskId: string): Promise<string> {
+    console.log(`⏳ Polling Replicate task: ${taskId}`);
+    
+    const maxAttempts = 30; // 5 minutes max
+    const pollInterval = 10000; // 10 seconds
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const response = await fetch(`https://api.replicate.com/v1/predictions/${taskId}`, {
+        headers: {
+          'Authorization': `Bearer ${this.replicateApiKey}`,
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to check task status: ${response.status}`);
+      }
+
+      const status = await response.json();
+      console.log(`📊 Task status: ${status.status}`);
+
+      if (status.status === 'succeeded' && status.output) {
+        return status.output;
+      } else if (status.status === 'failed') {
+        throw new Error('Music generation failed');
+      }
+
+      // Wait before next poll
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+    
+    throw new Error('Music generation timeout');
   }
 }
 
-function createProfessionalPrompt(musicAnalysis: MusicAnalysis, mode: string, instrument?: string, group?: string): string {
-  const keyInfo = `${musicAnalysis.key} ${musicAnalysis.mode}`;
-  const tempoInfo = `${musicAnalysis.tempo} BPM`;
-  const energyLevel = musicAnalysis.energy > 70 ? 'high energy' : 
-                    musicAnalysis.energy > 40 ? 'medium energy' : 'calm energy';
-
-  // Professional-grade prompts optimized for Stable Audio 2.0
-  if (mode === 'solo') {
-    const instrumentPrompts = {
-      'saxophone': `Professional jazz saxophone solo, ${keyInfo}, ${tempoInfo}, ${energyLevel}, smooth melodic improvisation, rich harmonic content, studio quality, stereo`,
-      'harmonica': `Expressive blues harmonica melody, ${keyInfo}, ${tempoInfo}, ${energyLevel}, authentic bends and vibrato, professional recording, stereo`,
-      'steelpan': `Caribbean steelpan melody, ${keyInfo}, ${tempoInfo}, ${energyLevel}, tropical rhythms, authentic island feel, high-quality recording, stereo`,
-      'electric-guitar': `Electric guitar solo, ${keyInfo}, ${tempoInfo}, ${energyLevel}, professional rock/blues style, melodic phrases, studio quality, stereo`
-    };
-    return instrumentPrompts[instrument!] || `Professional instrumental solo, ${keyInfo}, ${tempoInfo}, ${energyLevel}, studio quality, stereo`;
-  } else {
-    const groupPrompts = {
-      'orchestra': `Full orchestral arrangement, ${keyInfo}, ${tempoInfo}, ${energyLevel}, rich harmonies, strings, brass, woodwinds, professional recording, stereo`,
-      'soul-band': `1960s soul band arrangement, ${keyInfo}, ${tempoInfo}, ${energyLevel}, authentic rhythm section, horn arrangements, vintage sound, stereo`
-    };
-    return groupPrompts[group!] || `Professional full band arrangement, ${keyInfo}, ${tempoInfo}, ${energyLevel}, studio quality, stereo`;
+// Main music generation handler
+async function generateMusic(targetStyle: string, prompt?: string): Promise<string> {
+  console.log(`🎼 Starting music generation for style: ${targetStyle}`);
+  
+  const audioService = new EnterpriseAudioService();
+  const musicPrompt = prompt || `Professional ${targetStyle} instrumental music with high quality production`;
+  
+  try {
+    // Use Replicate for music generation
+    if (await audioService.checkReplicate()) {
+      console.log('🚀 Using Replicate for music generation');
+      return await audioService.generateWithReplicate(musicPrompt, targetStyle);
+    }
+    
+    throw new Error('No music generation services available');
+    
+  } catch (error) {
+    console.error('❌ Music generation failed:', error);
+    throw error;
   }
 }
 
-serve(async (req) => {
+// Handle HTTP requests
+serve(async (req: Request) => {
+  console.log('🎵 Virtuoso AI Composer - Music Generation Service');
+  
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { headers: corsHeaders, status: 405 }
+    );
   }
 
   try {
-    const stableAudioApiKey = Deno.env.get('STABLE_AUDIO_API_KEY');
-    
-    if (!stableAudioApiKey) {
-      console.log('⚠️ STABLE_AUDIO_API_KEY not found, using mock service');
+    // Parse request
+    const requestBody = await req.json();
+    const { targetStyle, prompt, audioUrl } = requestBody;
+
+    console.log('📋 Request parameters:', { targetStyle, prompt, audioUrl: audioUrl ? 'provided' : 'none' });
+
+    // Validate required parameters
+    if (!targetStyle) {
+      return new Response(
+        JSON.stringify({
+          error: true,
+          message: 'targetStyle is required'
+        }),
+        { headers: corsHeaders, status: 400 }
+      );
     }
 
-    const { mode, instrument, group, musicAnalysis } = await req.json();
-
-    console.log('🎵 Professional music generation');
-    console.log('🎼 Music analysis:', musicAnalysis);
-
-    // Create professional prompt based on real musical analysis
-    const enhancedPrompt = createProfessionalPrompt(musicAnalysis, mode, instrument, group);
-
-    console.log('🎯 Professional prompt:', enhancedPrompt);
-
-    let audioUrl: string;
-    let serviceName: string;
-    let quality: string;
-
-    if (stableAudioApiKey) {
-      // Use real Stable Audio service
-      const stableAudio = new ProfessionalStableAudioService(stableAudioApiKey);
-      
-      try {
-        // Verify service availability
-        const isAvailable = await stableAudio.isAvailable();
-        if (!isAvailable) {
-          throw new Error('Stable Audio service is currently unavailable');
-        }
-
-        // Generate high-quality music
-        audioUrl = await stableAudio.generateHighQualityMusic(enhancedPrompt, 60);
-        serviceName = 'Stable Audio 2.0';
-        quality = 'Professional 44.1kHz Stereo';
-      } catch (error) {
-        console.error('Stable Audio failed, falling back to mock:', error);
-        const mockService = new MockAudioService();
-        audioUrl = await mockService.generateMusic(enhancedPrompt, 60);
-        serviceName = 'Demo Audio Service';
-        quality = 'Demo Quality';
-      }
-    } else {
-      // Use mock service for demo
-      const mockService = new MockAudioService();
-      audioUrl = await mockService.generateMusic(enhancedPrompt, 60);
-      serviceName = 'Demo Audio Service';
-      quality = 'Demo Quality';
-    }
-
-    console.log('✅ Music generated successfully');
-    console.log('🔗 Audio URL:', audioUrl);
-
-    const generatedFileName = `virtuoso_${mode}_${instrument || group}_${musicAnalysis.key}_${Date.now()}.wav`;
+    // Generate music
+    console.log(`🎼 Generating ${targetStyle} music...`);
+    const audioUrl_result = await generateMusic(targetStyle, prompt);
 
     return new Response(
       JSON.stringify({
         success: true,
-        audioUrl: audioUrl,
-        fileName: generatedFileName,
-        duration: 60,
-        analysis: musicAnalysis,
-        serviceName: serviceName,
-        quality: quality,
-        message: `AI music generated in ${musicAnalysis.key} ${musicAnalysis.mode} at ${musicAnalysis.tempo} BPM`
+        audioUrl: audioUrl_result,
+        targetStyle,
+        service: 'Enterprise Music Generation',
+        message: 'Music generated successfully'
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
+      { headers: corsHeaders }
     );
 
   } catch (error) {
-    console.error('❌ Music generation error:', error);
+    console.error('❌ Request failed:', error);
     
     return new Response(
       JSON.stringify({
-        error: error.message,
-        success: false
+        error: true,
+        message: error.message || 'Music generation failed',
+        service: 'Enterprise Music Generation'
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      },
+      { headers: corsHeaders, status: 500 }
     );
   }
 });

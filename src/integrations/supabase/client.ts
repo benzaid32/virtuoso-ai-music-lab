@@ -2,17 +2,24 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Get environment variables with fallbacks
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://qxomxsjmmaktavblimfz.supabase.co";
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4b214c2ptbWFrdGF2YmxpbWZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMTM2MTUsImV4cCI6MjA2NTU4OTYxNX0.rHjz2ltPMQ04RzFr7fO6S8V0MH_2oaXQO_QmpaOBQ3A";
+// Get environment variables - NO FALLBACKS for security
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Validate environment variables
 if (!SUPABASE_URL) {
-  throw new Error('Missing VITE_SUPABASE_URL environment variable');
+  throw new Error('Missing VITE_SUPABASE_URL environment variable. Please check your .env.local file. For development, copy .env.template to .env.local and set required values.');
 }
 
 if (!SUPABASE_ANON_KEY) {
-  throw new Error('Missing VITE_SUPABASE_ANON_KEY environment variable');
+  throw new Error('Missing VITE_SUPABASE_ANON_KEY environment variable. Please check your .env.local file. For development, copy .env.template to .env.local and set required values.');
+}
+
+// Validate URL format
+try {
+  new URL(SUPABASE_URL);
+} catch {
+  throw new Error('Invalid VITE_SUPABASE_URL format. Must be a valid URL.');
 }
 
 // Import the supabase client like this:

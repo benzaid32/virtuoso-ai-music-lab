@@ -1,16 +1,23 @@
 /**
  * Professional Audio Processing Engine
- * Optimized for real-time music analysis
+ * Optimized for real-time music analysis and waveform visualization
  */
 
-export interface AudioAnalysis {
-  key: string;
-  mode: 'major' | 'minor';
-  tempo: number;
-  energy: number;
-  confidence: number;
-  duration: number;
-}
+import { z } from 'zod';
+
+/**
+ * Enterprise-grade audio analysis result schema
+ */
+export const AudioAnalysisSchema = z.object({
+  key: z.string(),
+  mode: z.enum(['major', 'minor']),
+  tempo: z.number(),
+  energy: z.number(),
+  confidence: z.number(),
+  duration: z.number().optional()
+});
+
+export type AudioAnalysis = z.infer<typeof AudioAnalysisSchema>;
 
 export interface WaveformData {
   peaks: number[];
@@ -22,6 +29,40 @@ export class AudioProcessor {
   private static readonly FFT_SIZE = 2048;
   private static readonly MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
   private static readonly MAX_DURATION = 300; // 5 minutes
+  
+  /**
+   * Enterprise optimization: Process only waveform visualization
+   * This removes the mock analysis and only handles waveform data
+   */
+  static async processWaveformOnly(file: File): Promise<{
+    waveform: WaveformData;
+  }> {
+    // Validate file
+    this.validateFile(file);
+
+    const arrayBuffer = await file.arrayBuffer();
+    const audioContext = new AudioContext({ sampleRate: this.SAMPLE_RATE });
+    
+    try {
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      // Get mono channel data
+      const samples = audioBuffer.getChannelData(0);
+      const duration = audioBuffer.duration;
+      
+      // Limit processing duration
+      const maxSamples = Math.min(samples.length, this.SAMPLE_RATE * this.MAX_DURATION);
+      const processedSamples = samples.slice(0, maxSamples);
+
+      // Only process waveform - no analysis
+      const waveform = await this.generateWaveform(processedSamples, duration);
+      
+      console.log('✅ Generated waveform visualization only');
+      return { waveform };
+    } finally {
+      await audioContext.close();
+    }
+  }
 
   /**
    * Process audio file and extract all analysis data
