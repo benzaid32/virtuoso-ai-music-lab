@@ -1,11 +1,24 @@
+/**
+ * Virtuoso AI Music Lab
+ * Enterprise Audio Processing App
+ * 
+ * Tech Stack:
+ * - Audio Analysis: Essentia.js (musical feature extraction)
+ * - Music Generation: Replicate MusicGen (meta/musicgen model)
+ * - Backend: Supabase Edge Functions
+ * 
+ * Flow: 
+ * 1. File Upload → 2. Audio Analysis → 3. Key/Tempo Detection → 4. AI Generation → 5. Output
+ */
+
 import { useState } from 'react';
-import { analyzeAudioFile } from './lib/api/audio-service';
+import { Upload, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload, Download, Music } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { analyzeAudioFile } from '@/lib/api/audio-service';
 import { AudioProcessor, type AudioAnalysis, type WaveformData } from '@/lib/audio/AudioProcessor';
 import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
 
 type Mode = 'solo' | 'group';
 type Instrument = 'saxophone' | 'harmonica' | 'steelpan' | 'electric-guitar';
@@ -57,10 +70,10 @@ export default function App() {
       setProgress(30);
       
       // Enterprise-grade audio analysis with ACRCloud
-      console.log('🚀 Using enterprise ACRCloud audio analysis...');
+      console.log('🚀 Using professional Essentia.js audio analysis...');
       
       // Direct file analysis with no storage - enterprise grade approach
-      console.log('🎵 Analyzing audio directly with professional ACRCloud service...');
+      console.log('🎵 Analyzing audio directly with professional Essentia.js service...');
       setProgress(40);
       
       // Analyze file directly without storing it
@@ -87,96 +100,118 @@ export default function App() {
     }
   };
 
-  const handleGenerate = async () => {
-    if (!analysis || !sourceFile) return;
-
-    setState('generating');
-    setError(null);
+  const handleAnalyze = async () => {
+    if (!sourceFile) return;
+    
+    setState('analyzing');
     setProgress(10);
+    setError(null);
 
     try {
-      setProgress(30);
-
-      // Determine target style based on user selection
-      const targetStyle = mode === 'solo' 
-        ? INSTRUMENTS.find(i => i.id === instrument)?.name || 'Jazz'
-        : GROUPS.find(g => g.id === group)?.name || 'Jazz Ensemble';
-
-      // Use a valid publicly accessible test URL for development
-      // In production, you would need to ensure proper audio file hosting
-      const testAudioUrl = 'https://www2.cs.uic.edu/~i101/SoundFiles/BabyElephantWalk60.wav';
+      console.log('🎵 Starting analysis...');
+      setProgress(50);
       
-      console.log('🎵 Generating music with Stability AI...');
-      console.log('📋 Parameters:', { audioUrl: testAudioUrl, targetStyle });
-
-      // Call Stability AI edge function with correct parameters
-      console.log('🚀 Calling Stability AI edge function...');
-      console.log('📋 Sending:', { audioUrl: testAudioUrl, targetStyle });
+      const result = await analyzeAudioFile(sourceFile.url);
+      console.log('✅ Analysis result:', result);
       
-      const { data, error } = await supabase.functions.invoke('virtuoso-ai-composer', {
-        body: {
-          audioUrl: testAudioUrl,
-          targetStyle: targetStyle
-        }
-      });
-
-      console.log('📊 Function response:', { data, error });
-      console.log('🔍 Raw data type:', typeof data);
-      console.log('🔍 Raw data content:', data);
-
-      // Parse response if it's a string (like we do for audio analysis)
-      let parsedData = data;
-      if (typeof data === 'string') {
-        try {
-          parsedData = JSON.parse(data);
-          console.log('🔍 Parsed string data into object:', parsedData);
-        } catch (parseError) {
-          console.error('❌ Failed to parse response:', parseError);
-        }
-      }
-
-      if (error) {
-        console.error('❌ Edge function error:', error);
-        throw new Error(error.message || 'Stability AI service error');
-      }
-      
-      console.log('🔍 Debug - parsedData.success:', parsedData?.success, typeof parsedData?.success);
-      console.log('🔍 Debug - full parsedData:', parsedData);
-      
-      if (!parsedData?.success) {
-        console.error('❌ Generation failed:', parsedData);
-        throw new Error(parsedData?.error || parsedData?.message || 'Stability AI music generation failed');
-      }
-
-      setProgress(90);
-
-      setGeneratedFile({
-        id: 'generated',
-        name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0,10)}.mp3`,
-        url: parsedData.audioUrl.audio, 
-        waveform: { peaks: [], duration: parsedData.analysis?.duration || 60 }
-      });
-
+      setAnalysis(result);
       setProgress(100);
-      setState('completed');
-
-    } catch (err: any) {
-      console.error('❌ Generation error:', err);
-      
-      const errorMessage = err.message?.includes('Stability') 
-        ? '🎵 Professional AI music generation is temporarily unavailable. Please try again in a few minutes.'
-        : err.message?.includes('API key') || err.message?.includes('Configuration') 
-        ? '🔑 Enterprise AI service requires proper API key configuration. Please contact support.'
-        : err.message?.includes('Service Unavailable')
-        ? '⚠️ Enterprise AI services are currently unavailable. Please try again later.'
-        : err.message?.includes('Generation Failed')
-        ? '🎭 AI music generation failed. Please try with a different style or audio file.'
-        : `❌ ${err.message || 'Professional music generation failed. Please try again.'}`;
-      
-      setError(errorMessage);
       setState('analyzed');
-    } finally {
-      setTimeout(() => setProgress(0), 1000);
+    } catch (error) {
+      console.error('❌ Analysis error:', error);
+      setError('Failed to analyze audio. Please try again.');
+      setState('import');
+      setProgress(0);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!analysis || !sourceFile) return;
+    
+    setError(null);
+    setState('generating');
+    setProgress(10);
+    
+    try {
+      // Get the instrument name
+      const targetStyle = INSTRUMENTS.find(i => i.id === instrument)?.name || 'Saxophone';
+
+      console.log('🎵 Generating music with Replicate MusicGen...');
+      console.log('📋 Parameters:', { targetStyle, analysis });
+      setProgress(20);
+
+      // Prepare API request
+      const requestBody = {
+        audioUrl: sourceFile.url, // Use actual user uploaded file
+        targetStyle: targetStyle,
+        analysis: analysis
+      };
+
+      try {
+        // Call the Supabase edge function
+        console.log('🚀 Calling edge function with:', requestBody);
+        setProgress(30);
+
+        const { data, error } = await supabase.functions.invoke('virtuoso-ai-composer', {
+          body: requestBody
+        });
+        
+        console.log('📊 Raw response:', { data, error });
+        setProgress(60);
+        
+        if (error) {
+          throw new Error(`API Error: ${error.message}`);
+        }
+
+        // Parse the response if needed
+        let parsedData = data;
+        if (typeof data === 'string') {
+          try {
+            parsedData = JSON.parse(data);
+            console.log('✅ Parsed string data:', parsedData);
+          } catch (parseError) {
+            console.error('⚠️ Parse error:', parseError);
+          }
+        }
+
+        // Check for success
+        if (!parsedData?.success) {
+          throw new Error(`Generation failed: ${parsedData?.message || 'Unknown error'}`);
+        }
+
+        // Parse the audio URL - it might come directly as a string or nested in an object
+        const audioUrl = typeof parsedData.audioUrl === 'string' 
+          ? parsedData.audioUrl 
+          : parsedData.audioUrl?.audio || parsedData.audioUrl;
+
+        console.log('🎵 Generated audio URL:', audioUrl);
+        setProgress(80);
+
+        if (!audioUrl) {
+          throw new Error('No audio URL in the response');
+        }
+
+        setGeneratedFile({
+          id: 'generated',
+          name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
+          url: audioUrl,
+          waveform: { peaks: [], duration: 30 } // Placeholder for waveform
+        });
+
+        setProgress(100);
+        setState('completed');
+
+      } catch (apiError: any) {
+        console.error('❌ API error:', apiError);
+        throw apiError; // Re-throw to be handled by outer catch
+      }
+
+    } catch (error: any) {
+      console.error('Generation error:', error);
+      const errorMessage = `❌ ${error.message || 'Music generation failed. Please try again.'}`;
+      setError(errorMessage);
+      setState('analyzed'); // Return to analyzed state
+      setProgress(0);
     }
   };
 
@@ -190,182 +225,211 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
-      <div className="container mx-auto px-6 py-8 max-w-4xl">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent mb-2">
-            Virtuoso.ai
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-4">
+            Virtuoso AI
           </h1>
-          <p className="text-xl text-gray-400">Professional AI Music Style Transfer</p>
+          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+            Transform any song into a perfect duet by adding AI-generated instrumental solos
+          </p>
         </div>
 
-        {/* Progress Bar */}
-        {progress > 0 && (
-          <div className="mb-6">
-            <Progress value={progress} className="w-full" />
-            <p className="text-sm text-gray-400 mt-2 text-center">
-              {state === 'analyzing' && 'Analyzing audio...'}
-              {state === 'generating' && 'Generating music...'}
-            </p>
+        {/* Progress Indicator */}
+        {(state === 'analyzing' || state === 'generating') && (
+          <div className="max-w-md mx-auto mb-8 p-6 bg-black/20 backdrop-blur-sm rounded-2xl border border-white/10">
+            <div className="flex items-center justify-center mb-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+              <span className="ml-3 text-white font-medium">
+                {state === 'analyzing' ? 'Analyzing your music...' : 'Creating your solo track...'}
+              </span>
+            </div>
+            <Progress value={progress} className="w-full h-2" />
           </div>
         )}
 
         {/* Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-900/50 border border-red-600 rounded-lg">
-            <p className="text-red-200">{error}</p>
+          <div className="max-w-md mx-auto mb-8 p-4 bg-red-500/10 backdrop-blur-sm rounded-2xl border border-red-500/20">
+            <p className="text-red-300 text-center">{error}</p>
           </div>
         )}
 
         {/* Main Content */}
-        <div className="bg-gray-800/50 rounded-lg p-8 backdrop-blur-sm">
-          {state === 'import' && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-center">Import & Configure</h2>
-              
-              {/* Mode Selection */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Mode</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {(['solo', 'group'] as const).map((m) => (
-                    <Button
-                      key={m}
-                      variant={mode === m ? 'default' : 'secondary'}
-                      onClick={() => setMode(m)}
-                      className="h-16 text-lg"
-                    >
-                      <Music className="mr-2" />
-                      {m === 'solo' ? 'Solo Instrument' : 'Full Ensemble'}
-                    </Button>
-                  ))}
+        {state === 'import' && (
+          <div className="max-w-4xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Upload Section */}
+              <div className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-white mb-2">Upload Your Track</h2>
+                  <p className="text-gray-400">We'll analyze it and create a perfect companion</p>
+                </div>
+                
+                <div 
+                  className="relative group cursor-pointer"
+                  onClick={() => document.getElementById('file-input')?.click()}
+                >
+                  <div className="border-2 border-dashed border-purple-500/50 rounded-2xl p-12 text-center transition-all duration-300 group-hover:border-purple-400 group-hover:bg-purple-500/5">
+                    <Upload className="mx-auto h-16 w-16 text-purple-400 mb-4 transition-transform group-hover:scale-110" />
+                    <p className="text-xl font-semibold text-white mb-2">Drop your audio file here</p>
+                    <p className="text-gray-400">or click to browse</p>
+                    <input
+                      id="file-input"
+                      type="file"
+                      accept="audio/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </div>
+                  {sourceFile && (
+                    <div className="absolute inset-0 bg-green-500/10 border-2 border-green-500 rounded-2xl flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">✅</div>
+                        <p className="text-green-300 font-medium">{sourceFile.name}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Instrument/Group Selection */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">
-                  {mode === 'solo' ? 'Instrument' : 'Ensemble Type'}
-                </h3>
-                <div className={cn(
-                  "grid gap-3",
-                  mode === 'solo' ? 'grid-cols-2' : 'grid-cols-1'
-                )}>
-                  {(mode === 'solo' ? INSTRUMENTS : GROUPS).map((item) => (
-                    <Button
+              {/* Instrument Selection */}
+              <div className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-white mb-2">Choose Your Instrument</h2>
+                  <p className="text-gray-400">Pick what solo you want to add</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {INSTRUMENTS.map((item) => (
+                    <button
                       key={item.id}
-                      variant={
-                        (mode === 'solo' ? instrument : group) === item.id 
-                          ? 'default' 
-                          : 'secondary'
-                      }
-                      onClick={() => {
-                        if (mode === 'solo') {
-                          setInstrument(item.id as Instrument);
-                        } else {
-                          setGroup(item.id as Group);
+                      onClick={() => setInstrument(item.id as Instrument)}
+                      className={`
+                        relative p-4 rounded-xl border-2 transition-all duration-300
+                        ${instrument === item.id 
+                          ? 'border-purple-400 bg-purple-500/20 scale-105' 
+                          : 'border-white/10 bg-white/5 hover:border-purple-500/50 hover:bg-purple-500/10'
                         }
-                      }}
-                      className="h-16 flex-col space-y-1"
+                      `}
                     >
-                      <span className="text-2xl">{item.emoji}</span>
-                      <span className="font-medium">{item.name}</span>
-                      <span className="text-xs opacity-70">{item.desc}</span>
-                    </Button>
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">{item.emoji}</div>
+                        <div className="text-white font-medium">{item.name}</div>
+                        <div className="text-gray-400 text-xs">{item.desc}</div>
+                      </div>
+                      {instrument === item.id && (
+                        <div className="absolute -top-1 -right-1 bg-purple-500 rounded-full w-6 h-6 flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                      )}
+                    </button>
                   ))}
                 </div>
-              </div>
 
-              {/* File Upload */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Upload Audio</h3>
-                <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-yellow-400 transition-colors">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <p className="text-lg mb-4">Upload your audio file</p>
-                  <Button asChild>
-                    <label className="cursor-pointer">
-                      Choose File
-                      <input
-                        type="file"
-                        accept="audio/*"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
-                    </label>
-                  </Button>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Supports MP3, WAV, FLAC • Max 50MB • Up to 5 minutes
+                {sourceFile && instrument && (
+                  <button
+                    onClick={handleAnalyze}
+                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl text-white font-semibold text-lg transition-all duration-300 hover:from-purple-500 hover:to-pink-500 hover:scale-105 shadow-lg hover:shadow-purple-500/25"
+                  >
+                    Analyze & Create Solo
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {state === 'analyzed' && analysis && sourceFile && (
+          <div className="max-w-2xl mx-auto text-center space-y-8">
+            <div>
+              <h2 className="text-3xl font-bold text-white mb-4">Perfect Match Found! 🎯</h2>
+              <p className="text-xl text-gray-300">
+                Ready to create your <span className="text-purple-400 font-semibold">
+                  {INSTRUMENTS.find(i => i.id === instrument)?.name}
+                </span> solo
+              </p>
+            </div>
+
+            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+              <h3 className="text-lg font-semibold text-white mb-6">Track Analysis</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <div className="text-2xl mb-2">🎹</div>
+                  <div className="text-purple-400 font-bold text-xl">{analysis.key} {analysis.mode}</div>
+                  <div className="text-gray-400 text-sm">Key</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl mb-2">🥁</div>
+                  <div className="text-blue-400 font-bold text-xl">{analysis.tempo}</div>
+                  <div className="text-gray-400 text-sm">BPM</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl mb-2">⚡</div>
+                  <div className="text-green-400 font-bold text-xl">{analysis.energy}%</div>
+                  <div className="text-gray-400 text-sm">Energy</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl mb-2">🎯</div>
+                  <div className="text-pink-400 font-bold text-xl">{Math.round(analysis.confidence * 100)}%</div>
+                  <div className="text-gray-400 text-sm">Confidence</div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleGenerate}
+              className="py-4 px-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl text-white font-semibold text-xl transition-all duration-300 hover:from-purple-500 hover:to-pink-500 hover:scale-105 shadow-lg hover:shadow-purple-500/25"
+            >
+              🎵 Generate My Solo Track
+            </button>
+          </div>
+        )}
+
+        {state === 'completed' && generatedFile && (
+          <div className="max-w-2xl mx-auto text-center space-y-8">
+            <div>
+              <h2 className="text-4xl font-bold text-white mb-4">🎉 Your Duet is Ready!</h2>
+              <p className="text-xl text-gray-300">
+                Perfect {INSTRUMENTS.find(i => i.id === instrument)?.name} solo created
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-green-900/20 to-blue-900/20 backdrop-blur-sm rounded-2xl p-8 border border-green-500/20">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-2xl font-semibold text-white mb-2">🎼 {generatedFile.name}</h3>
+                  <p className="text-gray-300">Ready to play alongside your original track</p>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <a
+                    href={generatedFile.url}
+                    download={generatedFile.name}
+                    className="flex items-center justify-center py-3 px-8 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl text-white font-semibold transition-all duration-300 hover:from-green-500 hover:to-emerald-500 hover:scale-105"
+                  >
+                    <Download className="mr-2" />
+                    Download Solo Track
+                  </a>
+                  <button
+                    onClick={reset}
+                    className="py-3 px-8 bg-white/10 border border-white/20 rounded-xl text-white font-semibold transition-all duration-300 hover:bg-white/20"
+                  >
+                    Create Another
+                  </button>
+                </div>
+
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                  <p className="text-yellow-200 text-sm">
+                    💡 <strong>Pro Tip:</strong> Play both tracks together in your music app for the perfect duet!
                   </p>
                 </div>
               </div>
             </div>
-          )}
-
-          {state === 'analyzed' && analysis && sourceFile && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-center">Analysis Complete</h2>
-              
-              <div className="bg-gray-700/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-4">Musical DNA</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div>
-                    <p className="text-gray-400">Key</p>
-                    <p className="text-xl font-bold text-yellow-400">
-                      {analysis.key} {analysis.mode}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Tempo</p>
-                    <p className="text-xl font-bold text-blue-400">{analysis.tempo} BPM</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Energy</p>
-                    <p className="text-xl font-bold text-green-400">{analysis.energy}%</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Confidence</p>
-                    <p className="text-xl font-bold text-purple-400">
-                      {Math.round(analysis.confidence * 100)}%
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-center">
-                <Button onClick={handleGenerate} size="lg" className="text-lg px-8">
-                  Generate AI Music
-                </Button>
-                <p className="text-sm text-gray-400 mt-2">
-                  This will create a 60-second {mode === 'solo' ? 'jazz' : 'full arrangement'} 
-                  in {analysis.key} {analysis.mode} at {analysis.tempo} BPM
-                </p>
-              </div>
-            </div>
-          )}
-
-          {state === 'completed' && generatedFile && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-center">Generation Complete</h2>
-              
-              <div className="bg-gray-700/50 rounded-lg p-6 text-center">
-                <h3 className="text-lg font-semibold mb-4">Your AI-Generated Music</h3>
-                <p className="text-gray-300 mb-4">{generatedFile.name}</p>
-                
-                <div className="flex justify-center space-x-4">
-                  <Button asChild>
-                    <a href={generatedFile.url} download={generatedFile.name}>
-                      <Download className="mr-2" />
-                      Download
-                    </a>
-                  </Button>
-                  <Button variant="secondary" onClick={reset}>
-                    Create Another
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
