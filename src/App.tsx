@@ -142,7 +142,7 @@ export default function App() {
 
       // Prepare API request
       const requestBody = {
-        audioUrl: sourceFile.url, // Use actual user uploaded file
+        // audioUrl: sourceFile.url, // TEMP: Remove blob URL (can't send over HTTP)
         targetStyle: targetStyle,
         analysis: analysis
       };
@@ -152,6 +152,11 @@ export default function App() {
         console.log('🚀 Calling edge function with:', requestBody);
         setProgress(30);
 
+        // Debug the request body before sending
+        console.log('🔍 Request body before sending:', requestBody);
+        console.log('🔍 Analysis keys:', Object.keys(analysis));
+        console.log('🔍 AudioUrl type:', typeof sourceFile.url, sourceFile.url.substring(0, 50));
+        
         const { data, error } = await supabase.functions.invoke('virtuoso-ai-composer', {
           body: requestBody
         });
@@ -330,6 +335,35 @@ export default function App() {
                 </div>
 
                 {sourceFile && instrument && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {GROUPS.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => setGroup(item.id as Group)}
+                        className={`
+                          relative p-4 rounded-xl border-2 transition-all duration-300
+                          ${group === item.id 
+                            ? 'border-purple-400 bg-purple-500/20 scale-105' 
+                            : 'border-white/10 bg-white/5 hover:border-purple-500/50 hover:bg-purple-500/10'
+                          }
+                        `}
+                      >
+                        <div className="text-center">
+                          <div className="text-3xl mb-2">{item.emoji}</div>
+                          <div className="text-white font-medium">{item.name}</div>
+                          <div className="text-gray-400 text-xs">{item.desc}</div>
+                        </div>
+                        {group === item.id && (
+                          <div className="absolute -top-1 -right-1 bg-purple-500 rounded-full w-6 h-6 flex items-center justify-center">
+                            <span className="text-white text-xs">✓</span>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {sourceFile && instrument && group && (
                   <button
                     onClick={handleAnalyze}
                     className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl text-white font-semibold text-lg transition-all duration-300 hover:from-purple-500 hover:to-pink-500 hover:scale-105 shadow-lg hover:shadow-purple-500/25"
@@ -355,26 +389,36 @@ export default function App() {
 
             <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
               <h3 className="text-lg font-semibold text-white mb-6">Track Analysis</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-4">
                 <div className="text-center">
                   <div className="text-2xl mb-2">🎹</div>
-                  <div className="text-purple-400 font-bold text-xl">{analysis.key} {analysis.mode}</div>
+                  <div className="text-purple-400 font-bold text-lg">{analysis.key} {analysis.mode}</div>
                   <div className="text-gray-400 text-sm">Key</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">🥁</div>
-                  <div className="text-blue-400 font-bold text-xl">{analysis.tempo}</div>
+                  <div className="text-blue-400 font-bold text-lg">{analysis.tempo?.toFixed(1) || 0}</div>
                   <div className="text-gray-400 text-sm">BPM</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">⚡</div>
-                  <div className="text-green-400 font-bold text-xl">{analysis.energy}%</div>
+                  <div className="text-green-400 font-bold text-lg">{analysis.energy?.toFixed(2) || 0}</div>
                   <div className="text-gray-400 text-sm">Energy</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">🎯</div>
-                  <div className="text-pink-400 font-bold text-xl">{Math.round(analysis.confidence * 100)}%</div>
+                  <div className="text-pink-400 font-bold text-lg">{Math.round(analysis.confidence * 100)}%</div>
                   <div className="text-gray-400 text-sm">Confidence</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl mb-2">🎵</div>
+                  <div className="text-amber-400 font-bold text-lg">{analysis.beat_times?.length || 0}</div>
+                  <div className="text-gray-400 text-sm">Beat Count</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl mb-2">⏱️</div>
+                  <div className="text-cyan-400 font-bold text-lg">{analysis.duration?.toFixed(0) || 0}s</div>
+                  <div className="text-gray-400 text-sm">Duration</div>
                 </div>
               </div>
             </div>

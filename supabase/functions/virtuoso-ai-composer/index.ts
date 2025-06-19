@@ -76,81 +76,33 @@ class EnterpriseAudioService {
     }
   }
 
-  // Create professional style-specific prompts with PERFECT SYNCHRONIZATION
-  createEnterprisePrompt(style: string, analysis?: any): string {
-    console.log(`🎯 Creating synchronized prompt for ${style}`, analysis);
+  // Create enterprise-grade prompts with professional analysis data from EC2 server
+  createEnterprisePrompt(style: string, analysis: any): string {
+    console.log(`🎯 Creating PERFECTLY SYNCHRONIZED prompt for ${style}`);
     
-    // Extract professional synchronization parameters
-    const tempo = analysis?.tempo ? parseFloat(analysis.tempo.toFixed(1)) : 120;
-    const key = analysis?.key || 'C';
-    const mode = analysis?.mode || analysis?.scale || 'major';
-    const energy = analysis?.energy || 0.5;
-    const beatDuration = analysis?.beat_duration || (60 / tempo);
-    const barDuration = analysis?.bar_duration || (beatDuration * 4);
-    const totalBars = analysis?.total_bars || 16;
+    // Extract CRITICAL synchronization parameters from your EC2 audio analysis
+    const tempo = parseFloat(analysis.tempo.toFixed(1));
+    const key = analysis.key;
+    const mode = analysis.mode || analysis.scale;
+    const duration = Math.min(Math.round(analysis.duration), 180);
+    const beatTimes = analysis.beat_times;
+    const downbeats = analysis.downbeats;
     
-    // Get beat markers for precise alignment
-    const beatTimes = analysis?.beat_times || [0, beatDuration, beatDuration * 2, beatDuration * 3];
-    const downbeats = analysis?.downbeats || [0, barDuration, barDuration * 2];
+    // PERFECT DUET SYNCHRONIZATION - Key parameters for alignment
+    console.log(`🎼 DUET SYNC: ${key} ${mode}, ${tempo} BPM, ${duration}s duration, ${beatTimes.length} beats`);
     
-    console.log(`🎼 Professional Sync Parameters:`, {
-      tempo: `${tempo} BPM`,
-      key: `${key} ${mode}`,
-      energy: energy.toFixed(2),
-      beatDuration: `${beatDuration.toFixed(3)}s`,
-      barDuration: `${barDuration.toFixed(2)}s`,
-      totalBars: totalBars,
-      beatMarkers: beatTimes.slice(0, 4).map(t => `${t.toFixed(2)}s`).join(', ')
-    });
+    // Calculate exact duration matching original audio
+    const targetDuration = Math.min(30, duration); // 30 second solo or match original if shorter
     
-    // Calculate precise duration for perfect loops
-    const targetDuration = Math.ceil(60 / barDuration) * barDuration;
+    // Create prompts for PERFECT TIMING ALIGNMENT
+    const syncPrompt = `Professional ${style.toLowerCase()} solo in ${key} ${mode} at EXACTLY ${tempo} BPM for ${targetDuration} seconds. CRITICAL: Match exact tempo ${tempo} BPM for perfect duet synchronization with original audio. Start immediately with main melody - no intro or fade-in. Maintain steady ${tempo} BPM throughout entire ${targetDuration} second duration.`;
     
-    // Professional base prompt with exact timing specifications
-    const basePrompt = `Professional ${style.toLowerCase()} solo composition in ${key} ${mode} at EXACTLY ${tempo} BPM. Duration: ${targetDuration} seconds. Strong downbeats at ${downbeats.slice(0, 3).map(t => `${t.toFixed(1)}s`).join(', ')}. Perfect timing for duet synchronization.`;
-    
-    // Style-specific synchronized prompts with beat markers
-    const stylePrompts = {
-      'Saxophone': `${basePrompt} Smooth jazz saxophone melody with bebop phrases. Syncopated rhythm locked to ${tempo} BPM grid. ${key} ${mode} bebop scales with blue notes. Sophisticated harmony matching energy level ${energy.toFixed(1)}. Professional studio recording with natural reverb.`,
-      
-      'Harmonica': `${basePrompt} Expressive blues harmonica with bent notes and vibrato. Steady rhythmic breathing pattern synchronized to beat markers. ${key} ${mode} blues scale with chromatic approaches. Dynamic expression matching energy ${energy.toFixed(1)}. Intimate microphone placement.`,
-      
-      'Steel Pan': `${basePrompt} Tropical steel pan with Caribbean rhythmic patterns. Precise calypso timing with ghost notes between beats. ${key} ${mode} pentatonic melodies with grace notes. Bright resonant tone with natural sustain. Perfect metric alignment for dancing.`,
-      
-      'Electric Guitar': `${basePrompt} Jazz electric guitar with clean tone and subtle chorus. Walking bass line rhythm with chord comping. ${key} ${mode} jazz chord progressions with extensions. Sophisticated phrasing with pick dynamics. Studio quality direct injection.`,
-      
-      'Violin': `${basePrompt} Expressive violin solo with classical bowing technique. Precise articulation on beat markers. ${key} ${mode} scales with ornaments and trills. Dynamic expression from pianissimo to forte. Concert hall acoustics with natural resonance.`,
-      
-      'Acoustic Guitar': `${basePrompt} Fingerstyle acoustic guitar with intricate patterns. Steady picking rhythm with alternating bass. ${key} ${mode} open chord voicings with hammer-ons. Warm natural tone with body resonance. Close microphone recording.`,
-      
-      'Piano': `${basePrompt} Grand piano solo with classical touch and pedaling. Precise timing with rhythmic articulation. ${key} ${mode} scales and arpeggios with voice leading. Dynamic expression with tempo rubato. Concert hall reverb and ambience.`,
-      
-      'Flute': `${basePrompt} Concert flute with pure tone and breath control. Flowing melodic lines with precise intonation. ${key} ${mode} scales with embellishments. Expressive phrasing with subtle vibrato. Chamber music intimacy and clarity.`
-    };
-    
-    const prompt = stylePrompts[style] || `${basePrompt}, melodic ${style.toLowerCase()} solo instrument with professional recording quality and perfect timing synchronization`;
-    
-    // Add energy-based expression markers for musical dynamics
-    let finalPrompt = prompt;
-    if (energy < 0.3) {
-      finalPrompt += '. Gentle dynamics with intimate expression and subtle musical nuances. Soft attack and delicate phrasing.';
-    } else if (energy > 0.7) {
-      finalPrompt += '. Bold energetic performance with powerful dynamics and confident expression. Strong attack with assertive phrasing.';
-    } else {
-      finalPrompt += '. Balanced dynamics with expressive musical phrasing and natural flow. Moderate attack with musical sensitivity.';
-    }
-    
-    // Add specific timing instruction for perfect alignment
-    if (analysis?.beat_times && analysis.beat_times.length > 0) {
-      finalPrompt += ` Critical: Strong musical events must align with beat markers at ${analysis.beat_times.slice(0, 8).map(t => `${t.toFixed(2)}s`).join(', ')}... for perfect duet synchronization.`;
-    }
-    
-    console.log(`✨ Final synchronized prompt: ${finalPrompt.substring(0, 150)}...`);
-    return finalPrompt;
+    console.log(`✨ Final synchronized prompt: ${syncPrompt.substring(0, 150)}...`);
+    return syncPrompt;
   }
 
   // Enterprise Music Generation
-  async generateWithReplicate(prompt: string, style: string, analysis?: any, audioUrl?: string): Promise<string> {
+  async generateWithReplicate(prompt: string, style: string, analysis: any, audioUrl?: string): Promise<string> {
     console.log(`🎵 Enterprise Music Generation: ${style.toUpperCase()}`);
     
     const enhancedPrompt = this.createEnterprisePrompt(style, analysis);
@@ -165,35 +117,65 @@ class EnterpriseAudioService {
   }
 
   // Execute generation with enterprise model and PERFECT SYNCHRONIZATION
-  private async executeGeneration(prompt: string, analysis?: any, audioUrl?: string): Promise<string> {
+  private async executeGeneration(prompt: string, analysis: any, audioUrl?: string): Promise<string> {
     console.log(`🚀 Using ${ENTERPRISE_MODEL.name} enterprise model with synchronization`);
+    const startTime = Date.now();
     
-    // Calculate synchronized duration based on tempo
-    const tempo = analysis?.tempo || 120;
+    // Enhanced enterprise-grade API key security and validation
+    // @ts-ignore - Deno exists in deployment but not in IDE
+    this.replicateApiKey = Deno.env.get("REPLICATE_API_KEY");
+    
+    if (!this.replicateApiKey) {
+      console.error("❌ Error: REPLICATE_API_KEY environment variable is required");
+      throw new Error('API key not configured for enterprise music service');
+    }
+    
+    // Validate security requirements
+    if (this.replicateApiKey.length < 30) {
+      console.warn("⚠️ Warning: API key appears to be invalid (too short)");
+    }
+    
+    // Log security status but never expose actual key
+    console.log(`🔐 API key validation: ${this.replicateApiKey ? '✅ Present' : '❌ Missing'} [${this.replicateApiKey ? this.replicateApiKey.substring(0, 3) + '...' + this.replicateApiKey.substring(this.replicateApiKey.length - 3) : 'none'}]`);
+    
+    // Track enterprise request metrics
+    console.log(`📊 Request parameters: Key=${analysis.key}, BPM=${analysis.tempo}, Beats=${analysis.beat_times.length}, Confidence=${analysis.confidence}`);
+    
+    // Calculate synchronized duration based on tempo - ENSURE IT'S UNDER 30 SECONDS
+    const tempo = analysis.tempo;
     const beatDuration = 60 / tempo; // seconds per beat
     const barDuration = beatDuration * 4; // 4/4 time signature
-    const synchronizedDuration = Math.ceil(60 / barDuration) * barDuration; // Round to complete bars
     
-    console.log(`⏱️ Synchronized duration: ${synchronizedDuration}s (${tempo} BPM, ${synchronizedDuration / barDuration} bars)`);
+    // Calculate ideal duration but cap at 30 seconds (Replicate's limit)
+    const idealDuration = Math.ceil(30 / barDuration) * barDuration; // Round to complete bars within 30s
+    const synchronizedDuration = Math.min(30, Math.max(5, idealDuration)); // Between 5-30 seconds
     
+    console.log(`⏱️ Synchronized duration: ${synchronizedDuration}s (${tempo} BPM, ${synchronizedDuration / barDuration} bars, range: 5-30s)`);
+    
+    // CRITICAL: Use original audio as melody conditioning for STYLE TRANSFER (not generation)
     const requestBody: any = {
       version: ENTERPRISE_MODEL.version,
       input: {
+        model_version: "melody",
         prompt: prompt,
-        duration: Math.min(synchronizedDuration, 60), // Cap at 60s for performance
-        output_format: "wav", // Highest quality for professional use
-        temperature: 0.8, // Balanced creativity vs coherence
-        top_k: 250, // Optimal sampling for musical quality
-        top_p: 0.0, // Disable nucleus sampling for consistency
-        classifier_free_guidance: 3.0 // Enhanced prompt adherence
+        duration: Math.floor(synchronizedDuration), // Ensure integer and under 30s
+        temperature: 0.8,
+        top_k: 250,
+        top_p: 0.9,
+        seed: -1,
+        continuation: false,
+        normalization_strategy: "loudness",
+        classifier_free_guidance: 7
       }
     };
     
-    // Add melody conditioning if audio URL provided
+    // 🎯 CRITICAL FEATURE: Audio conditioning for style transfer
     if (audioUrl) {
-      console.log(`🎼 Adding melody conditioning from: ${audioUrl}`);
-      requestBody.input.melody = audioUrl;
-      requestBody.input.continuation = true; // Enable melody-based generation
+      console.log(`🎵 STYLE TRANSFER MODE: Using original audio as melody guide`);
+      requestBody.input.melody = audioUrl;  // This transforms YOUR song
+      requestBody.input.continuation = false; // Style transfer, not continuation
+    } else {
+      console.log(`🎼 GENERATION MODE: Creating new music based on analysis`);
     }
     
     const response = await fetch('https://api.replicate.com/v1/predictions', {
@@ -280,7 +262,7 @@ class EnterpriseAudioService {
 }
 
 // Enterprise Music Generation Orchestrator
-async function generateMusic(targetStyle: string, prompt?: string, analysis?: any, audioUrl?: string): Promise<string> {
+async function generateMusic(targetStyle: string, prompt?: string, analysis: any, audioUrl?: string): Promise<string> {
   console.log(`🎼 Enterprise Music Generation: ${targetStyle.toUpperCase()}`);
   console.log(`📊 Analysis provided: ${analysis ? 'Yes' : 'No'}`);
   
@@ -306,19 +288,35 @@ async function generateMusic(targetStyle: string, prompt?: string, analysis?: an
   }
 }
 
-// Enterprise HTTP Handler with Enhanced Error Handling
+// Enterprise HTTP Handler with Enhanced Error Handling and Performance Metrics
 // @ts-ignore - Deno exists in deployment but not in IDE
 serve(async (req: Request) => {
   console.log('🎵 Virtuoso AI Composer - Enterprise Music Generation Service');
   const startTime = Date.now();
+  let audioAnalysisProvided = false;
+  let requestSource = 'unknown';
   
-  // Set proper CORS headers for all responses
+  // Set proper CORS headers for all responses - ALLOW ANONYMOUS ACCESS
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info, apikey',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info, apikey, x-request-source',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
+
+  // Skip authentication for public music generation service
+  console.log('🔓 Running in anonymous mode - no authentication required');
+  
+  // Track request source for enterprise analytics
+  try {
+    const source = req.headers.get('x-request-source');
+    if (source) {
+      requestSource = source;
+      console.log(`📱 Request source: ${requestSource}`);
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not determine request source');
+  }
   
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -343,20 +341,41 @@ serve(async (req: Request) => {
   }
   
   try {
-    // Parse request body
+    // Parse request body - Handle multiple formats
     let requestBody;
     try {
-      const text = await req.text();
-      if (text) {
-        requestBody = JSON.parse(text);
-      } else {
-        throw new Error('Empty request body');
+      // Try different parsing methods
+      let rawData;
+      
+      // Method 1: Try .json() first (recommended for JSON)
+      try {
+        const clonedReq = req.clone();
+        rawData = await clonedReq.json();
+        console.log('📥 Parsed body using .json():', { keys: Object.keys(rawData) });
+      } catch (jsonError) {
+        console.log('⚠️ .json() failed, trying .text()');
+        
+        // Method 2: Fallback to .text() and manual parse
+        const text = await req.text();
+        console.log('📥 Raw text length:', text.length);
+        
+        if (!text || text.trim() === '') {
+          throw new Error('Request body is completely empty');
+        }
+        
+        rawData = JSON.parse(text);
+        console.log('📥 Parsed body using .text():', { keys: Object.keys(rawData) });
       }
+      
+      requestBody = rawData;
+      
     } catch (parseError) {
       console.error('❌ Request parsing error:', parseError);
+      console.error('❌ Headers:', Object.fromEntries(req.headers.entries()));
+      
       return new Response(JSON.stringify({
         error: true,
-        message: 'Invalid request format',
+        message: `Invalid request format: ${parseError.message}`,
         service: 'Virtuoso AI Enterprise'
       }), {
         headers: corsHeaders,
@@ -380,6 +399,17 @@ serve(async (req: Request) => {
           error: true,
           message: 'targetStyle is required for music generation',
           validStyles: ['jazz', 'soul', 'classical', 'world', 'blues', 'rock', 'electronic', 'folk'],
+          service: 'Virtuoso AI Enterprise'
+        }),
+        { headers: corsHeaders, status: 400 }
+      );
+    }
+
+    if (!analysis) {
+      return new Response(
+        JSON.stringify({
+          error: true,
+          message: 'Analysis data is required for music generation',
           service: 'Virtuoso AI Enterprise'
         }),
         { headers: corsHeaders, status: 400 }
