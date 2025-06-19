@@ -76,104 +76,125 @@ class EnterpriseAudioService {
     }
   }
 
-  // CEO-Level Prompt Engineering Strategy for Perfect Solo Instrument Alignment
-  private createEnterprisePrompt(style: string, analysis?: any): string {
-    let basePrompt = '';
-    let instrument = '';
+  // Create professional style-specific prompts with PERFECT SYNCHRONIZATION
+  createEnterprisePrompt(style: string, analysis?: any): string {
+    console.log(`🎯 Creating synchronized prompt for ${style}`, analysis);
     
-    // Map style to specific instrument and professional solo performance instructions
-    const styleToInstrument = {
-      'jazz': {
-        instrument: 'saxophone',
-        prompt: 'Professional solo jazz saxophone improvisation with sophisticated harmony and smooth phrasing'
-      },
-      'soul': {
-        instrument: 'electric piano',
-        prompt: 'Soulful solo R&B electric piano with rich emotional expression and warm tone'
-      },
-      'classical': {
-        instrument: 'piano',
-        prompt: 'Classical solo piano piece with refined dynamics and elegant phrasing'
-      },
-      'world': {
-        instrument: 'sitar',
-        prompt: 'World music solo sitar performance with authentic cultural phrasing and expressive melody'
-      },
-      'blues': {
-        instrument: 'guitar',
-        prompt: 'Traditional solo blues guitar with authentic feel, expressive bends, and soulful phrasing'
-      },
-      'rock': {
-        instrument: 'electric guitar',
-        prompt: 'Solo rock electric guitar performance with dynamic energy and melodic hooks'
-      },
-      'electronic': {
-        instrument: 'synthesizer',
-        prompt: 'Modern solo synthesizer melody with crisp sound design and precise articulation'
-      },
-      'folk': {
-        instrument: 'acoustic guitar',
-        prompt: 'Acoustic solo folk guitar with organic feel and intimate presence'
-      }
+    // Extract professional synchronization parameters
+    const tempo = analysis?.tempo ? parseFloat(analysis.tempo.toFixed(1)) : 120;
+    const key = analysis?.key || 'C';
+    const mode = analysis?.mode || analysis?.scale || 'major';
+    const energy = analysis?.energy || 0.5;
+    const beatDuration = analysis?.beat_duration || (60 / tempo);
+    const barDuration = analysis?.bar_duration || (beatDuration * 4);
+    const totalBars = analysis?.total_bars || 16;
+    
+    // Get beat markers for precise alignment
+    const beatTimes = analysis?.beat_times || [0, beatDuration, beatDuration * 2, beatDuration * 3];
+    const downbeats = analysis?.downbeats || [0, barDuration, barDuration * 2];
+    
+    console.log(`🎼 Professional Sync Parameters:`, {
+      tempo: `${tempo} BPM`,
+      key: `${key} ${mode}`,
+      energy: energy.toFixed(2),
+      beatDuration: `${beatDuration.toFixed(3)}s`,
+      barDuration: `${barDuration.toFixed(2)}s`,
+      totalBars: totalBars,
+      beatMarkers: beatTimes.slice(0, 4).map(t => `${t.toFixed(2)}s`).join(', ')
+    });
+    
+    // Calculate precise duration for perfect loops
+    const targetDuration = Math.ceil(60 / barDuration) * barDuration;
+    
+    // Professional base prompt with exact timing specifications
+    const basePrompt = `Professional ${style.toLowerCase()} solo composition in ${key} ${mode} at EXACTLY ${tempo} BPM. Duration: ${targetDuration} seconds. Strong downbeats at ${downbeats.slice(0, 3).map(t => `${t.toFixed(1)}s`).join(', ')}. Perfect timing for duet synchronization.`;
+    
+    // Style-specific synchronized prompts with beat markers
+    const stylePrompts = {
+      'Saxophone': `${basePrompt} Smooth jazz saxophone melody with bebop phrases. Syncopated rhythm locked to ${tempo} BPM grid. ${key} ${mode} bebop scales with blue notes. Sophisticated harmony matching energy level ${energy.toFixed(1)}. Professional studio recording with natural reverb.`,
+      
+      'Harmonica': `${basePrompt} Expressive blues harmonica with bent notes and vibrato. Steady rhythmic breathing pattern synchronized to beat markers. ${key} ${mode} blues scale with chromatic approaches. Dynamic expression matching energy ${energy.toFixed(1)}. Intimate microphone placement.`,
+      
+      'Steel Pan': `${basePrompt} Tropical steel pan with Caribbean rhythmic patterns. Precise calypso timing with ghost notes between beats. ${key} ${mode} pentatonic melodies with grace notes. Bright resonant tone with natural sustain. Perfect metric alignment for dancing.`,
+      
+      'Electric Guitar': `${basePrompt} Jazz electric guitar with clean tone and subtle chorus. Walking bass line rhythm with chord comping. ${key} ${mode} jazz chord progressions with extensions. Sophisticated phrasing with pick dynamics. Studio quality direct injection.`,
+      
+      'Violin': `${basePrompt} Expressive violin solo with classical bowing technique. Precise articulation on beat markers. ${key} ${mode} scales with ornaments and trills. Dynamic expression from pianissimo to forte. Concert hall acoustics with natural resonance.`,
+      
+      'Acoustic Guitar': `${basePrompt} Fingerstyle acoustic guitar with intricate patterns. Steady picking rhythm with alternating bass. ${key} ${mode} open chord voicings with hammer-ons. Warm natural tone with body resonance. Close microphone recording.`,
+      
+      'Piano': `${basePrompt} Grand piano solo with classical touch and pedaling. Precise timing with rhythmic articulation. ${key} ${mode} scales and arpeggios with voice leading. Dynamic expression with tempo rubato. Concert hall reverb and ambience.`,
+      
+      'Flute': `${basePrompt} Concert flute with pure tone and breath control. Flowing melodic lines with precise intonation. ${key} ${mode} scales with embellishments. Expressive phrasing with subtle vibrato. Chamber music intimacy and clarity.`
     };
-
-    // Get instrument-specific prompt or fallback to generic prompt
-    const styleObj = styleToInstrument[style.toLowerCase()];
-    if (styleObj) {
-      basePrompt = styleObj.prompt;
-      instrument = styleObj.instrument;
+    
+    const prompt = stylePrompts[style] || `${basePrompt}, melodic ${style.toLowerCase()} solo instrument with professional recording quality and perfect timing synchronization`;
+    
+    // Add energy-based expression markers for musical dynamics
+    let finalPrompt = prompt;
+    if (energy < 0.3) {
+      finalPrompt += '. Gentle dynamics with intimate expression and subtle musical nuances. Soft attack and delicate phrasing.';
+    } else if (energy > 0.7) {
+      finalPrompt += '. Bold energetic performance with powerful dynamics and confident expression. Strong attack with assertive phrasing.';
     } else {
-      basePrompt = `Professional solo ${style} instrumental performance`;
-      instrument = style;
+      finalPrompt += '. Balanced dynamics with expressive musical phrasing and natural flow. Moderate attack with musical sensitivity.';
     }
-
-    // Enhanced prompt with musical analysis for perfect alignment
-    if (analysis) {
-      const key = analysis.key || 'C';
-      const mode = analysis.mode || 'major';
-      const tempo = Math.round(analysis.tempo || 120);
-      const energy = analysis.energy || 0.7;
-      
-      // Energy-based descriptors
-      const energyDescriptor = energy > 0.8 ? 'high energy, driving' : 
-                              energy > 0.5 ? 'medium energy, balanced' : 
-                              'relaxed, contemplative';
-      
-      // Tempo-based style adjustments
-      const tempoStyle = tempo > 140 ? 'uptempo' : 
-                        tempo > 100 ? 'moderate tempo' : 
-                        'slow tempo';
-
-      // Solo instrument-focused prompt for perfect complementary track
-      basePrompt = `${basePrompt} in ${key} ${mode}, exactly ${tempo} BPM, ${tempoStyle}, ${energyDescriptor}. ` + 
-        `Solo ${instrument} only, no backing instruments, no drums, no accompaniment. ` + 
-        `Create a complementary solo performance that will align perfectly with existing music. ` + 
-        `Professional studio quality recording with natural spacing and dynamics.`;
-      
-      console.log(`🎨 Enhanced Solo Instrument Prompt: ${basePrompt}`);
+    
+    // Add specific timing instruction for perfect alignment
+    if (analysis?.beat_times && analysis.beat_times.length > 0) {
+      finalPrompt += ` Critical: Strong musical events must align with beat markers at ${analysis.beat_times.slice(0, 8).map(t => `${t.toFixed(2)}s`).join(', ')}... for perfect duet synchronization.`;
     }
-
-    return basePrompt;
+    
+    console.log(`✨ Final synchronized prompt: ${finalPrompt.substring(0, 150)}...`);
+    return finalPrompt;
   }
 
   // Enterprise Music Generation
-  async generateWithReplicate(prompt: string, style: string, analysis?: any): Promise<string> {
+  async generateWithReplicate(prompt: string, style: string, analysis?: any, audioUrl?: string): Promise<string> {
     console.log(`🎵 Enterprise Music Generation: ${style.toUpperCase()}`);
     
     const enhancedPrompt = this.createEnterprisePrompt(style, analysis);
     
     // Use enterprise model
     try {
-      return await this.executeGeneration(enhancedPrompt);
+      return await this.executeGeneration(enhancedPrompt, analysis, audioUrl);
     } catch (error) {
       console.error('❌ Enterprise model failed:', error.message);
       throw new Error('Enterprise music generation temporarily unavailable');
     }
   }
 
-  // Execute generation with enterprise model
-  private async executeGeneration(prompt: string): Promise<string> {
-    console.log(`🚀 Using ${ENTERPRISE_MODEL.name} enterprise model`);
+  // Execute generation with enterprise model and PERFECT SYNCHRONIZATION
+  private async executeGeneration(prompt: string, analysis?: any, audioUrl?: string): Promise<string> {
+    console.log(`🚀 Using ${ENTERPRISE_MODEL.name} enterprise model with synchronization`);
+    
+    // Calculate synchronized duration based on tempo
+    const tempo = analysis?.tempo || 120;
+    const beatDuration = 60 / tempo; // seconds per beat
+    const barDuration = beatDuration * 4; // 4/4 time signature
+    const synchronizedDuration = Math.ceil(60 / barDuration) * barDuration; // Round to complete bars
+    
+    console.log(`⏱️ Synchronized duration: ${synchronizedDuration}s (${tempo} BPM, ${synchronizedDuration / barDuration} bars)`);
+    
+    const requestBody: any = {
+      version: ENTERPRISE_MODEL.version,
+      input: {
+        prompt: prompt,
+        duration: Math.min(synchronizedDuration, 60), // Cap at 60s for performance
+        output_format: "wav", // Highest quality for professional use
+        temperature: 0.8, // Balanced creativity vs coherence
+        top_k: 250, // Optimal sampling for musical quality
+        top_p: 0.0, // Disable nucleus sampling for consistency
+        classifier_free_guidance: 3.0 // Enhanced prompt adherence
+      }
+    };
+    
+    // Add melody conditioning if audio URL provided
+    if (audioUrl) {
+      console.log(`🎼 Adding melody conditioning from: ${audioUrl}`);
+      requestBody.input.melody = audioUrl;
+      requestBody.input.continuation = true; // Enable melody-based generation
+    }
     
     const response = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
@@ -181,18 +202,7 @@ class EnterpriseAudioService {
         'Authorization': `Bearer ${this.replicateApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        version: ENTERPRISE_MODEL.version,
-        input: {
-          prompt: prompt,
-          duration: 30, // Optimal for style transfer demonstrations
-          output_format: "wav", // Highest quality for professional use
-          temperature: 0.8, // Balanced creativity vs coherence
-          top_k: 250, // Optimal sampling for musical quality
-          top_p: 0.0, // Disable nucleus sampling for consistency
-          classifier_free_guidance: 3.0 // Enhanced prompt adherence
-        }
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -270,7 +280,7 @@ class EnterpriseAudioService {
 }
 
 // Enterprise Music Generation Orchestrator
-async function generateMusic(targetStyle: string, prompt?: string, analysis?: any): Promise<string> {
+async function generateMusic(targetStyle: string, prompt?: string, analysis?: any, audioUrl?: string): Promise<string> {
   console.log(`🎼 Enterprise Music Generation: ${targetStyle.toUpperCase()}`);
   console.log(`📊 Analysis provided: ${analysis ? 'Yes' : 'No'}`);
   
@@ -285,7 +295,7 @@ async function generateMusic(targetStyle: string, prompt?: string, analysis?: an
     }
     
     console.log('🚀 Initiating enterprise music generation pipeline');
-    const result = await audioService.generateWithReplicate(musicPrompt, targetStyle, analysis);
+    const result = await audioService.generateWithReplicate(musicPrompt, targetStyle, analysis, audioUrl);
     
     console.log('✅ Enterprise generation completed successfully');
     return result;
@@ -384,7 +394,7 @@ serve(async (req: Request) => {
       const audioService = new EnterpriseAudioService();
       
       // Generate music with professional enterprise service
-      const audioUrl_result = await audioService.generateWithReplicate(prompt || '', targetStyle, analysis);
+      const audioUrl_result = await audioService.generateWithReplicate(prompt || '', targetStyle, analysis, audioUrl);
       
       const processingTime = Date.now() - startTime;
       console.log(`⚡ Enterprise generation completed in ${Math.round(processingTime / 1000)}s`);
