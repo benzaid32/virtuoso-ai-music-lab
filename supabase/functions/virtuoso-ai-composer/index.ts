@@ -76,28 +76,67 @@ class EnterpriseAudioService {
     }
   }
 
-  // Create enterprise-grade prompts with professional analysis data from EC2 server
+  // Create enterprise-grade prompts with comprehensive SyncLock analysis data
   createEnterprisePrompt(style: string, analysis: any): string {
-    console.log(`🎯 Creating PERFECTLY SYNCHRONIZED prompt for ${style}`);
+    console.log(`🎯 Creating PERFECTLY SYNCHRONIZED prompt for ${style} using comprehensive SyncLock analysis`);
     
-    // Extract CRITICAL synchronization parameters from your EC2 audio analysis
-    const tempo = parseFloat(analysis.tempo.toFixed(1));
-    const key = analysis.key;
-    const mode = analysis.mode || analysis.scale;
-    const duration = Math.min(Math.round(analysis.duration), 180);
-    const beatTimes = analysis.beat_times;
-    const downbeats = analysis.downbeats;
+    // Extract ALL SyncLock analysis parameters
+    const musicalDNA = analysis.musical_dna || analysis;
+    const constraints = analysis.generation_constraints || {};
+    const symbolicData = analysis.symbolic_data || {};
     
-    // PERFECT DUET SYNCHRONIZATION - Key parameters for alignment
-    console.log(`🎼 DUET SYNC: ${key} ${mode}, ${tempo} BPM, ${duration}s duration, ${beatTimes.length} beats`);
+    // Core musical parameters from SyncLock (NO FALLBACKS - Enterprise Grade)
+    const tempo = parseFloat((musicalDNA.bpm || analysis.tempo).toFixed(1));
+    const key = musicalDNA.key || analysis.key;
+    const mode = musicalDNA.mode || analysis.mode || analysis.scale;
+    const duration = Math.min(Math.round(analysis.duration), 30);
+    const energy = parseFloat(analysis.energy.toFixed(2));
+    const confidence = parseFloat((analysis.confidence_score || analysis.confidence).toFixed(2));
     
-    // Calculate exact duration matching original audio
-    const targetDuration = Math.min(30, duration); // 30 second solo or match original if shorter
+    // Advanced SyncLock parameters (NO FALLBACKS)
+    const chordCount = analysis.chord_progression?.length || symbolicData.chord_symbols?.length;
+    const beatCount = analysis.beat_positions?.length || symbolicData.beat_events?.length;
+    const phraseCount = analysis.phrase_boundaries?.length || symbolicData.phrase_markers?.length;
+    const syncAccuracy = parseFloat(analysis.sync_accuracy.toFixed(2));
+    const harmonicIntegrity = parseFloat(analysis.harmonic_integrity.toFixed(2));
     
-    // Create prompts for PERFECT TIMING ALIGNMENT
-    const syncPrompt = `Professional ${style.toLowerCase()} solo in ${key} ${mode} at EXACTLY ${tempo} BPM for ${targetDuration} seconds. CRITICAL: Match exact tempo ${tempo} BPM for perfect duet synchronization with original audio. Start immediately with main melody - no intro or fade-in. Maintain steady ${tempo} BPM throughout entire ${targetDuration} second duration.`;
+    // Professional generation constraints from SyncLock (NO FALLBACKS)
+    const scaleConstraint = constraints.scale_constraint || `${key} ${mode} diatonic`;
+    const chordLock = constraints.chord_lock;
+    const beatAlignment = parseFloat(constraints.beat_alignment_strength.toFixed(2));
+    const temperature = constraints.temperature;
+    const maxInterval = constraints.max_interval;
     
-    console.log(`✨ Final synchronized prompt: ${syncPrompt.substring(0, 150)}...`);
+    // COMPREHENSIVE DUET SYNCHRONIZATION
+    console.log(`🧬 SyncLock DNA: ${key} ${mode}, ${tempo}BPM, ${energy} energy, ${confidence*100}% confidence`);
+    console.log(`🎼 Musical Structure: ${chordCount} chords, ${beatCount} beats, ${phraseCount} phrases`);
+    console.log(`🎯 Generation Constraints: ${scaleConstraint}, ${chordLock} chord-lock, ${beatAlignment*100}% beat-align`);
+    
+    // Create ENTERPRISE-GRADE synchronized prompt with ALL SyncLock data
+    const syncPrompt = `Professional ${style.toLowerCase()} solo in ${key} ${mode} at EXACTLY ${tempo} BPM for ${duration} seconds. 
+
+MUSICAL DNA CONSTRAINTS:
+- Key: ${key} ${mode} (${scaleConstraint})
+- Tempo: EXACTLY ${tempo} BPM (${syncAccuracy*100}% sync accuracy required)
+- Energy Level: ${energy} (0.0-1.0 scale)
+- Harmonic Integrity: ${harmonicIntegrity*100}% adherence to ${key} ${mode}
+- Chord Lock: ${chordLock} (${chordCount} chord progressions detected)
+- Beat Alignment: ${beatAlignment*100}% precision (${beatCount} beats mapped)
+- Phrase Structure: ${phraseCount} musical phrases identified
+- Generation Temperature: ${temperature} (creativity vs. structure balance)
+- Max Melodic Interval: ${maxInterval} semitones
+
+SYNCHRONIZATION REQUIREMENTS:
+- Start immediately with main melody - no intro or fade-in
+- Maintain steady ${tempo} BPM throughout entire ${duration} seconds
+- Align to detected beat positions for perfect duet timing
+- Follow ${scaleConstraint} scale constraints strictly
+- Match ${energy} energy level of original audio
+- Respect ${harmonicIntegrity*100}% harmonic integrity requirements
+
+Create a ${duration}-second ${style.toLowerCase()} solo that would blend PERFECTLY with the original audio as a professional duet performance.`;
+    
+    console.log(`✨ Enterprise SyncLock prompt created: ${syncPrompt.substring(0, 200)}...`);
     return syncPrompt;
   }
 

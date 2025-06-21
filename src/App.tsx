@@ -16,8 +16,8 @@ import { Upload, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { analyzeAudioFile } from '@/lib/api/audio-service';
-import { AudioProcessor, type AudioAnalysis, type WaveformData } from '@/lib/audio/AudioProcessor';
+import { analyzeAudioFile, type MusicAnalysis } from '@/lib/api/audio-service';
+import { AudioProcessor, type WaveformData } from '@/lib/audio/AudioProcessor';
 import { supabase } from '@/integrations/supabase/client';
 
 type Mode = 'solo' | 'group';
@@ -50,7 +50,7 @@ export default function App() {
   const [mode, setMode] = useState<Mode>('solo');
   const [instrument, setInstrument] = useState<Instrument>('saxophone');
   const [group, setGroup] = useState<Group>('orchestra');
-  const [analysis, setAnalysis] = useState<AudioAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState<MusicAnalysis | null>(null);
   const [sourceFile, setSourceFile] = useState<AudioFile | null>(null);
   const [generatedFile, setGeneratedFile] = useState<AudioFile | null>(null);
   const [progress, setProgress] = useState(0);
@@ -76,12 +76,27 @@ export default function App() {
       console.log('🎵 Analyzing audio directly with professional Essentia.js service...');
       setProgress(40);
       
-      // Analyze file directly without storing it
-      const audioAnalysis = await analyzeAudioFile(file);
+      // Analyze file directly without storing it with timeout
+      console.log('🎯 Starting audio analysis with 3-minute timeout...');
+      const analysisTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Analysis timeout - please try again')), 180000)
+      );
+      
+      const audioAnalysis = await Promise.race([
+        analyzeAudioFile(file),
+        analysisTimeout
+      ]) as any;
+      
+      console.log('✅ Audio analysis completed successfully');
       setProgress(80);
       setProgress(100);
 
       // Set analysis and source file
+      console.log('🔄 Setting analysis state with:', {
+        beats: audioAnalysis.beat_positions?.length || 0,
+        bpm: audioAnalysis.bpm || audioAnalysis.tempo,
+        key: audioAnalysis.key
+      });
       setAnalysis(audioAnalysis);
       setSourceFile({
         id: `temp-${Date.now()}`,
@@ -136,15 +151,53 @@ export default function App() {
       // Get the instrument name
       const targetStyle = INSTRUMENTS.find(i => i.id === instrument)?.name || 'Saxophone';
 
-      console.log('🎵 Generating music with Replicate MusicGen...');
-      console.log('📋 Parameters:', { targetStyle, analysis });
+      console.log('🎵 Generating music with comprehensive SyncLock analysis...');
+      console.log('📋 Target Style:', targetStyle);
+      console.log('🧬 SyncLock Analysis Summary:', {
+        key: analysis.key,
+        mode: analysis.mode,
+        bpm: analysis.tempo,
+        energy: analysis.energy,
+        confidence: analysis.confidence,
+        chord_count: analysis.chord_progression?.length || 0,
+        beat_count: analysis.beat_positions?.length || 0,
+        phrase_count: analysis.phrase_boundaries?.length || 0,
+        sync_accuracy: analysis.sync_accuracy,
+        harmonic_integrity: analysis.harmonic_integrity
+      });
       setProgress(20);
 
-      // Prepare API request
+      // Prepare comprehensive API request with all SyncLock data
       const requestBody = {
-        // audioUrl: sourceFile.url, // TEMP: Remove blob URL (can't send over HTTP)
         targetStyle: targetStyle,
-        analysis: analysis
+        // Core musical DNA
+        analysis: {
+          ...analysis,
+          // Ensure all SyncLock fields are passed
+          musical_dna: analysis.musical_dna,
+          generation_constraints: analysis.generation_constraints,
+          quantum_time_grid: analysis.quantum_time_grid,
+          symbolic_data: analysis.symbolic_data,
+          // Professional analysis metrics
+          sync_accuracy: analysis.sync_accuracy,
+          harmonic_integrity: analysis.harmonic_integrity,
+          rhythmic_stability: analysis.rhythmic_stability,
+          confidence_score: analysis.confidence_score || analysis.confidence
+        },
+        // Enhanced generation parameters based on SyncLock analysis
+        generation_params: {
+          preserve_key: `${analysis.key} ${analysis.mode}`,
+          target_bpm: analysis.tempo,
+          energy_level: analysis.energy,
+          chord_progression: analysis.chord_progression,
+          beat_positions: analysis.beat_positions,
+          phrase_boundaries: analysis.phrase_boundaries,
+          // Use SyncLock's professional constraints
+          constraints: analysis.generation_constraints,
+          // Sample-accurate timing from quantum grid
+          timing_precision: 'sample_accurate',
+          sync_anchors: analysis.quantum_time_grid?.sync_anchors
+        }
       };
 
       try {
@@ -156,7 +209,7 @@ export default function App() {
         console.log('🔍 Request body before sending:', requestBody);
         console.log('🔍 Analysis keys:', Object.keys(analysis));
         console.log('🔍 AudioUrl type:', typeof sourceFile.url, sourceFile.url.substring(0, 50));
-        
+
         const { data, error } = await supabase.functions.invoke('virtuoso-ai-composer', {
           body: requestBody
         });
@@ -199,8 +252,8 @@ export default function App() {
         setGeneratedFile({
           id: 'generated',
           name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
-          url: audioUrl,
-          waveform: { peaks: [], duration: 30 } // Placeholder for waveform
+          url: audioUrl
+          // No placeholder or mock waveform data - enterprise-grade real data only
         });
 
         setProgress(100);
@@ -389,7 +442,7 @@ export default function App() {
 
             <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
               <h3 className="text-lg font-semibold text-white mb-6">Track Analysis</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
                 <div className="text-center">
                   <div className="text-2xl mb-2">🎹</div>
                   <div className="text-purple-400 font-bold text-lg">{analysis.key} {analysis.mode}</div>
@@ -397,12 +450,12 @@ export default function App() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">🥁</div>
-                  <div className="text-blue-400 font-bold text-lg">{analysis.tempo?.toFixed(1) || 0}</div>
+                  <div className="text-blue-400 font-bold text-lg">{analysis.tempo?.toFixed(1)}</div>
                   <div className="text-gray-400 text-sm">BPM</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">⚡</div>
-                  <div className="text-green-400 font-bold text-lg">{analysis.energy?.toFixed(2) || 0}</div>
+                  <div className="text-green-400 font-bold text-lg">{analysis.energy?.toFixed(2)}</div>
                   <div className="text-gray-400 text-sm">Energy</div>
                 </div>
                 <div className="text-center">
@@ -412,14 +465,76 @@ export default function App() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">🎵</div>
-                  <div className="text-amber-400 font-bold text-lg">{analysis.beat_times?.length || 0}</div>
+                  <div className="text-amber-400 font-bold text-lg">{analysis.beat_positions?.length || analysis.beat_times?.length}</div>
                   <div className="text-gray-400 text-sm">Beat Count</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">⏱️</div>
-                  <div className="text-cyan-400 font-bold text-lg">{analysis.duration?.toFixed(0) || 0}s</div>
+                  <div className="text-cyan-400 font-bold text-lg">{analysis.duration?.toFixed(0)}s</div>
                   <div className="text-gray-400 text-sm">Duration</div>
                 </div>
+              </div>
+
+              {/* Advanced SyncLock Data */}
+              <div className="bg-gray-800/50 rounded-xl p-6 mb-8">
+                <h3 className="text-xl font-bold mb-4 text-gradient bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  🧬 SyncLock Musical DNA
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="text-center">
+                    <div className="text-lg mb-1">🎼</div>
+                    <div className="text-blue-400 font-bold">{analysis.chord_progression?.length}</div>
+                    <div className="text-gray-400 text-sm">Chords</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg mb-1">🎪</div>
+                    <div className="text-purple-400 font-bold">{analysis.phrase_boundaries?.length}</div>
+                    <div className="text-gray-400 text-sm">Phrases</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg mb-1">⚡</div>
+                    <div className="text-green-400 font-bold">{Math.round(analysis.sync_accuracy * 100)}%</div>
+                    <div className="text-gray-400 text-sm">Sync Accuracy</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg mb-1">🔮</div>
+                    <div className="text-pink-400 font-bold">{Math.round(analysis.harmonic_integrity * 100)}%</div>
+                    <div className="text-gray-400 text-sm">Harmony</div>
+                  </div>
+                </div>
+                
+                {/* Generation Constraints Display */}
+                {analysis.generation_constraints && (
+                  <div className="bg-gray-700/50 rounded-lg p-4">
+                    <div className="text-sm font-semibold mb-2 text-orange-400">🎯 AI Generation Constraints</div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-400">Scale:</span> 
+                        <span className="text-blue-400 ml-1">{analysis.generation_constraints.scale_constraint}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Temperature:</span> 
+                        <span className="text-green-400 ml-1">{analysis.generation_constraints.temperature}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Chord Lock:</span> 
+                        <span className="text-purple-400 ml-1">{analysis.generation_constraints.chord_lock}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Beat Alignment:</span> 
+                        <span className="text-pink-400 ml-1">{Math.round((analysis.generation_constraints.beat_alignment_strength || 0) * 100)}%</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Max Interval:</span> 
+                        <span className="text-amber-400 ml-1">{analysis.generation_constraints.max_interval}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Energy Match:</span> 
+                        <span className="text-cyan-400 ml-1">{analysis.generation_constraints.energy_matching ? 'Yes' : 'No'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -52,7 +52,7 @@ Set the following secrets using the Supabase CLI:
 npx supabase secrets set MUSICAPI_AI_KEY=your-music-api-key
 
 # ACRCloud for professional audio analysis
-npx supabase secrets set ACR_ACCESS_KEY=faeaXbQt7cYdRXUa
+npx supabase secrets set ACR_ACCESS_KEY=
 npx supabase secrets set ACR_ACCESS_SECRET=OAQgl5tkcwXcRe0pS4QjMTkaBdaZgYu
 
 # Replicate for fallback music generation (optional)
