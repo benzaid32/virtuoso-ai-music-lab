@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "net": ["udioapi.pro", "api.udioapi.pro"],
+    "env": ["UDIO_API_KEY"]
+  }
+}

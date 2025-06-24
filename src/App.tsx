@@ -154,7 +154,8 @@ export default function App() {
       console.log('🚀 Calling Supabase Edge Function...');
       setProgress(30);
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/virtuoso-ai-composer`, {
+      // First attempt
+      let response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/virtuoso-ai-composer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,7 +173,7 @@ export default function App() {
         })
       });
 
-      if (!response.ok) {
+      if (!response.ok && response.status !== 202) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -189,6 +190,70 @@ export default function App() {
       }
 
       console.log('✅ Parsed response:', data);
+
+      // Handle generation in progress (status 202)
+      if (response.status === 202 && data.workId) {
+        console.log('⏳ Music generation in progress, retrying with workId:', data.workId);
+        setProgress(40);
+        
+        // Wait and retry up to 6 times with the SAME workId (total ~4-5 minutes)
+        for (let retry = 1; retry <= 6; retry++) {
+          console.log(`🔄 Retry attempt ${retry}/6 - waiting 30 seconds...`);
+          console.log(`⏰ Total time elapsed: ~${Math.round((75 + retry * 30) / 60)} minutes`);
+          setProgress(40 + (retry * 8)); // 40, 48, 56, 64, 72, 80
+          
+          // Wait 30 seconds before retry
+          await new Promise(resolve => setTimeout(resolve, 30000));
+          
+          try {
+            response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/virtuoso-ai-composer`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+              },
+              body: JSON.stringify({
+                prompt,
+                targetStyle,
+                workId: data.workId, // 🔑 Pass the existing workId to check status
+                analysis: {
+                  tempo: analysis.tempo,
+                  key: analysis.key,
+                  energy: analysis.energy
+                }
+              })
+            });
+
+            const retryResult = await response.text();
+            let retryData;
+            try {
+              retryData = typeof retryResult === 'string' ? JSON.parse(retryResult) : retryResult;
+            } catch (e) {
+              console.error('Failed to parse retry response:', e);
+              continue; // Try next retry
+            }
+
+            console.log(`🔄 Retry ${retry} response:`, retryData);
+
+            if (retryData.success && retryData.audioUrl) {
+              data = retryData;
+              break; // Success! Exit retry loop
+            }
+            
+            // Give user feedback about longer wait times
+            if (retry === 3) {
+              console.log('💭 Music generation is taking longer than usual, but this is normal for high-quality tracks...');
+            }
+            
+          } catch (retryError) {
+            console.error(`❌ Retry ${retry} failed:`, retryError);
+            if (retry === 6) {
+              throw new Error(`Music generation is taking longer than expected (${Math.round((75 + 6 * 30) / 60)} minutes). The track might still be generating. Please try again in a few minutes, or contact support if this persists.`);
+            }
+          }
+        }
+      }
 
       if (!data.success) {
         throw new Error(data.error || 'Generation failed');
