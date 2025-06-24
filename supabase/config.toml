@@ -1,4 +1,3 @@
-
 project_id = "qxomxsjmmaktavblimfz"
 
 [api]
@@ -27,3 +26,6 @@ enabled = true
 
 [functions.generate-music]
 verify_jwt = true
+
+[functions.virtuoso-ai-composer]
+verify_jwt = false

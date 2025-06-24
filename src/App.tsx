@@ -11,12 +11,14 @@
  * 1. File Upload → 2. Audio Analysis → 3. Key/Tempo Detection → 4. AI Generation → 5. Output
  */
 
-import { useState } from 'react';
-import { Upload, Download } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Upload, Music, Play, Pause, Download, Volume2, BarChart3, Clock, Zap, Target, Settings, Star } from 'lucide-react';
+import { analyzeAudioFile, SimpleAudioService } from './lib/api/audio-service';
+import type { MusicAnalysis, GenerationResult } from './lib/types/music-analysis';
+
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { analyzeAudioFile, type MusicAnalysis } from '@/lib/api/audio-service';
 import { AudioProcessor, type WaveformData } from '@/lib/audio/AudioProcessor';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -28,7 +30,7 @@ interface AudioFile {
   id: string;
   name: string;
   url: string;
-  waveform: WaveformData;
+  waveform?: WaveformData;
 }
 
 type AppState = 'import' | 'analyzing' | 'analyzed' | 'generating' | 'completed';
@@ -55,6 +57,8 @@ export default function App() {
   const [generatedFile, setGeneratedFile] = useState<AudioFile | null>(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [targetStyle, setTargetStyle] = useState('Jazz Saxophone');
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -77,9 +81,9 @@ export default function App() {
       setProgress(40);
       
       // Analyze file directly without storing it with timeout
-      console.log('🎯 Starting audio analysis with 3-minute timeout...');
+      console.log('🎯 Starting audio analysis with 5-minute timeout for full file support...');
       const analysisTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Analysis timeout - please try again')), 180000)
+        setTimeout(() => reject(new Error('Analysis timeout - please try again')), 300000)
       );
       
       const audioAnalysis = await Promise.race([
@@ -93,7 +97,7 @@ export default function App() {
 
       // Set analysis and source file
       console.log('🔄 Setting analysis state with:', {
-        beats: audioAnalysis.beat_positions?.length || 0,
+        beats: audioAnalysis.beatCount || 0,
         bpm: audioAnalysis.bpm || audioAnalysis.tempo,
         key: audioAnalysis.key
       });
@@ -116,160 +120,176 @@ export default function App() {
   };
 
   const handleAnalyze = async () => {
-    if (!sourceFile) return;
+    if (!sourceFile || !analysis) return;
     
-    setState('analyzing');
-    setProgress(10);
+    setState('analyzed');
+    setProgress(100);
     setError(null);
 
-    try {
-      console.log('🎵 Starting analysis...');
-      setProgress(50);
-      
-      const result = await analyzeAudioFile(sourceFile.url);
-      console.log('✅ Analysis result:', result);
-      
-      setAnalysis(result);
-      setProgress(100);
-      setState('analyzed');
-    } catch (error) {
-      console.error('❌ Analysis error:', error);
-      setError('Failed to analyze audio. Please try again.');
-      setState('import');
-      setProgress(0);
-    }
+    console.log('✅ Analysis already completed during upload:', analysis);
   };
 
   const handleGenerate = async () => {
-    if (!analysis || !sourceFile) return;
-    
-    setError(null);
-    setState('generating');
-    setProgress(10);
-    
-    try {
-      // Get the instrument name
-      const targetStyle = INSTRUMENTS.find(i => i.id === instrument)?.name || 'Saxophone';
+    if (!analysis) return;
 
-      console.log('🎵 Generating music with comprehensive SyncLock analysis...');
-      console.log('📋 Target Style:', targetStyle);
-      console.log('🧬 SyncLock Analysis Summary:', {
-        key: analysis.key,
-        mode: analysis.mode,
-        bpm: analysis.tempo,
-        energy: analysis.energy,
-        confidence: analysis.confidence,
-        chord_count: analysis.chord_progression?.length || 0,
-        beat_count: analysis.beat_positions?.length || 0,
-        phrase_count: analysis.phrase_boundaries?.length || 0,
-        sync_accuracy: analysis.sync_accuracy,
-        harmonic_integrity: analysis.harmonic_integrity
-      });
+    const targetStyle = mode === 'solo' ? INSTRUMENTS.find(i => i.id === instrument)?.name : 
+                      GROUPS.find(g => g.id === group)?.name;
+
+    if (!targetStyle) return;
+
+    setState('generating');
+    setIsGenerating(true);
+    setProgress(10);
+    setError(null);
+
+    try {
+      console.log('🎵 Starting music generation...');
       setProgress(20);
 
-      // Prepare comprehensive API request with all SyncLock data
-      const requestBody = {
-        targetStyle: targetStyle,
-        // Core musical DNA
-        analysis: {
-          ...analysis,
-          // Ensure all SyncLock fields are passed
-          musical_dna: analysis.musical_dna,
-          generation_constraints: analysis.generation_constraints,
-          quantum_time_grid: analysis.quantum_time_grid,
-          symbolic_data: analysis.symbolic_data,
-          // Professional analysis metrics
-          sync_accuracy: analysis.sync_accuracy,
-          harmonic_integrity: analysis.harmonic_integrity,
-          rhythmic_stability: analysis.rhythmic_stability,
-          confidence_score: analysis.confidence_score || analysis.confidence
+      // Generate music prompt from analysis
+      const prompt = `Professional ${targetStyle} solo instrumental in ${analysis.key} major at ${analysis.tempo} BPM, ${analysis.energy > 0.6 ? 'high' : analysis.energy > 0.4 ? 'medium' : 'low'} energy, balanced, studio quality recording, no vocals`;
+      console.log('🎵 Generated prompt:', prompt);
+
+      // Call Supabase Edge Function with proper request
+      console.log('🚀 Calling Supabase Edge Function...');
+      setProgress(30);
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/virtuoso-ai-composer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
         },
-        // Enhanced generation parameters based on SyncLock analysis
-        generation_params: {
-          preserve_key: `${analysis.key} ${analysis.mode}`,
-          target_bpm: analysis.tempo,
-          energy_level: analysis.energy,
-          chord_progression: analysis.chord_progression,
-          beat_positions: analysis.beat_positions,
-          phrase_boundaries: analysis.phrase_boundaries,
-          // Use SyncLock's professional constraints
-          constraints: analysis.generation_constraints,
-          // Sample-accurate timing from quantum grid
-          timing_precision: 'sample_accurate',
-          sync_anchors: analysis.quantum_time_grid?.sync_anchors
-        }
-      };
-
-      try {
-        // Call the Supabase edge function
-        console.log('🚀 Calling edge function with:', requestBody);
-        setProgress(30);
-
-        // Debug the request body before sending
-        console.log('🔍 Request body before sending:', requestBody);
-        console.log('🔍 Analysis keys:', Object.keys(analysis));
-        console.log('🔍 AudioUrl type:', typeof sourceFile.url, sourceFile.url.substring(0, 50));
-
-        const { data, error } = await supabase.functions.invoke('virtuoso-ai-composer', {
-          body: requestBody
-        });
-        
-        console.log('📊 Raw response:', { data, error });
-        setProgress(60);
-        
-        if (error) {
-          throw new Error(`API Error: ${error.message}`);
-        }
-
-        // Parse the response if needed
-        let parsedData = data;
-        if (typeof data === 'string') {
-          try {
-            parsedData = JSON.parse(data);
-            console.log('✅ Parsed string data:', parsedData);
-          } catch (parseError) {
-            console.error('⚠️ Parse error:', parseError);
+        body: JSON.stringify({
+          prompt,
+          targetStyle,
+          analysis: {
+            tempo: analysis.tempo,
+            key: analysis.key,
+            energy: analysis.energy
           }
-        }
+        })
+      });
 
-        // Check for success
-        if (!parsedData?.success) {
-          throw new Error(`Generation failed: ${parsedData?.message || 'Unknown error'}`);
-        }
-
-        // Parse the audio URL - it might come directly as a string or nested in an object
-        const audioUrl = typeof parsedData.audioUrl === 'string' 
-          ? parsedData.audioUrl 
-          : parsedData.audioUrl?.audio || parsedData.audioUrl;
-
-        console.log('🎵 Generated audio URL:', audioUrl);
-        setProgress(80);
-
-        if (!audioUrl) {
-          throw new Error('No audio URL in the response');
-        }
-
-        setGeneratedFile({
-          id: 'generated',
-          name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
-          url: audioUrl
-          // No placeholder or mock waveform data - enterprise-grade real data only
-        });
-
-        setProgress(100);
-        setState('completed');
-
-      } catch (apiError: any) {
-        console.error('❌ API error:', apiError);
-        throw apiError; // Re-throw to be handled by outer catch
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+
+      const result = await response.text();
+      console.log('📦 Raw response:', result);
+
+      // Parse response - it might come as JSON string
+      let data;
+      try {
+        data = typeof result === 'string' ? JSON.parse(result) : result;
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        throw new Error('Invalid response format from server');
+      }
+
+      console.log('✅ Parsed response:', data);
+
+      if (!data.success) {
+        throw new Error(data.error || 'Generation failed');
+      }
+
+      // Parse the audio URL - it might come directly as a string or nested in an object
+      const audioUrl = typeof data.audioUrl === 'string' 
+        ? data.audioUrl 
+        : data.audioUrl?.audio || data.audioUrl;
+
+      console.log('🎵 Generated audio URL:', audioUrl);
+      setProgress(80);
+
+      if (!audioUrl) {
+        throw new Error('No audio URL in the response');
+      }
+
+      setGeneratedFile({
+        id: 'generated',
+        name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
+        url: audioUrl
+        // No placeholder or mock waveform data - enterprise-grade real data only
+      });
+
+      setProgress(100);
+      setState('completed');
+      setIsGenerating(false);
 
     } catch (error: any) {
       console.error('Generation error:', error);
       const errorMessage = `❌ ${error.message || 'Music generation failed. Please try again.'}`;
+      console.log(errorMessage);
       setError(errorMessage);
-      setState('analyzed'); // Return to analyzed state
+      setState('analyzed');
+      setIsGenerating(false);
       setProgress(0);
+    }
+  };
+
+  const handleGenerateMusic = async () => {
+    if (!analysis || !sourceFile) {
+      setError('Please analyze audio first');
+      return;
+    }
+
+    try {
+      console.log('🎯 Starting music generation...');
+      console.log('Analysis data being sent:', analysis);
+
+      const response = await fetch('/api/virtuoso-ai-composer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          analysis,
+          targetStyle,
+          generationConstraints: analysis.generationConstraints,
+          musicalDNA: analysis.musicalDNA,
+          symbolicData: analysis.symbolicData,
+          quantumTimeGrid: analysis.quantumTimeGrid
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Generation failed: ${response.status}`);
+      }
+
+      const data = await response.text();
+      console.log('Raw response:', data);
+
+      let parsedData;
+      try {
+        parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        throw new Error('Invalid response format from generation service');
+      }
+
+      console.log('Parsed generation result:', parsedData);
+
+      if (!parsedData.success) {
+        throw new Error(parsedData.error || 'Generation failed');
+      }
+
+      // Parse the audio URL - it might come directly as a string or nested in an object
+      const audioUrl = typeof parsedData.audioUrl === 'string' 
+        ? parsedData.audioUrl 
+        : parsedData.audioUrl?.audio || parsedData.audioUrl;
+
+      console.log('🎵 Generated audio URL:', audioUrl);
+
+      setGeneratedFile({
+        id: 'generated',
+        name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
+        url: audioUrl
+      });
+
+    } catch (error) {
+      console.error('❌ Generation error:', error);
+      setError(error instanceof Error ? error.message : 'Generation failed');
     }
   };
 
@@ -465,7 +485,7 @@ export default function App() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">🎵</div>
-                  <div className="text-amber-400 font-bold text-lg">{analysis.beat_positions?.length || analysis.beat_times?.length}</div>
+                  <div className="text-amber-400 font-bold text-lg">{analysis.beatCount}</div>
                   <div className="text-gray-400 text-sm">Beat Count</div>
                 </div>
                 <div className="text-center">
@@ -483,54 +503,54 @@ export default function App() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   <div className="text-center">
                     <div className="text-lg mb-1">🎼</div>
-                    <div className="text-blue-400 font-bold">{analysis.chord_progression?.length}</div>
+                    <div className="text-blue-400 font-bold">{analysis.chordCount}</div>
                     <div className="text-gray-400 text-sm">Chords</div>
                   </div>
                   <div className="text-center">
                     <div className="text-lg mb-1">🎪</div>
-                    <div className="text-purple-400 font-bold">{analysis.phrase_boundaries?.length}</div>
+                    <div className="text-purple-400 font-bold">{analysis.phraseCount}</div>
                     <div className="text-gray-400 text-sm">Phrases</div>
                   </div>
                   <div className="text-center">
                     <div className="text-lg mb-1">⚡</div>
-                    <div className="text-green-400 font-bold">{Math.round(analysis.sync_accuracy * 100)}%</div>
+                    <div className="text-green-400 font-bold">{Math.round(analysis.syncAccuracy * 100)}%</div>
                     <div className="text-gray-400 text-sm">Sync Accuracy</div>
                   </div>
                   <div className="text-center">
                     <div className="text-lg mb-1">🔮</div>
-                    <div className="text-pink-400 font-bold">{Math.round(analysis.harmonic_integrity * 100)}%</div>
+                    <div className="text-pink-400 font-bold">{Math.round(analysis.harmonicIntegrity * 100)}%</div>
                     <div className="text-gray-400 text-sm">Harmony</div>
                   </div>
                 </div>
                 
                 {/* Generation Constraints Display */}
-                {analysis.generation_constraints && (
+                {analysis.generationConstraints && (
                   <div className="bg-gray-700/50 rounded-lg p-4">
                     <div className="text-sm font-semibold mb-2 text-orange-400">🎯 AI Generation Constraints</div>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                       <div>
                         <span className="text-gray-400">Scale:</span> 
-                        <span className="text-blue-400 ml-1">{analysis.generation_constraints.scale_constraint}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Temperature:</span> 
-                        <span className="text-green-400 ml-1">{analysis.generation_constraints.temperature}</span>
+                        <span className="text-blue-400 ml-1">{analysis.generationConstraints.scaleConstraint}</span>
                       </div>
                       <div>
                         <span className="text-gray-400">Chord Lock:</span> 
-                        <span className="text-purple-400 ml-1">{analysis.generation_constraints.chord_lock}</span>
+                        <span className="text-purple-400 ml-1">{analysis.generationConstraints.chordLock}</span>
                       </div>
                       <div>
                         <span className="text-gray-400">Beat Alignment:</span> 
-                        <span className="text-pink-400 ml-1">{Math.round((analysis.generation_constraints.beat_alignment_strength || 0) * 100)}%</span>
+                        <span className="text-pink-400 ml-1">{Math.round((analysis.generationConstraints.beatAlignment || 0) * 100)}%</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Temperature:</span> 
+                        <span className="text-green-400 ml-1">{analysis.generationConstraints.temperature}</span>
                       </div>
                       <div>
                         <span className="text-gray-400">Max Interval:</span> 
-                        <span className="text-amber-400 ml-1">{analysis.generation_constraints.max_interval}</span>
+                        <span className="text-amber-400 ml-1">{analysis.generationConstraints.maxInterval}</span>
                       </div>
                       <div>
                         <span className="text-gray-400">Energy Match:</span> 
-                        <span className="text-cyan-400 ml-1">{analysis.generation_constraints.energy_matching ? 'Yes' : 'No'}</span>
+                        <span className="text-cyan-400 ml-1">{analysis.generationConstraints.energyMatch ? 'Yes' : 'No'}</span>
                       </div>
                     </div>
                   </div>

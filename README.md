@@ -17,7 +17,7 @@ The AI preserves your original song's musical DNA (key, tempo, energy) while com
 - **Frontend**: React 18 + TypeScript + Vite
 - **UI**: Tailwind CSS + Radix UI components
 - **Backend**: Supabase Edge Functions (API integration only)
-- **AI**: Replicate MusicGen (melody model)
+- **AI**: Udio API Pro (melody model)
 - **Audio Analysis**: Enterprise audio analysis server for real-time key/tempo detection
 - **Audio Processing**: Professional Web Audio API
 
@@ -26,14 +26,24 @@ The AI preserves your original song's musical DNA (key, tempo, energy) while com
 ### Prerequisites
 - Node.js 18+
 - Supabase account
-- Replicate API key
+- Udio API key
 
 ### Environment Variables
 Create `.env.local`:
 ```env
+# Supabase Configuration
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-REPLICATE_API_KEY=your_replicate_key
+
+# 🎵 Core Music Generation API
+# Get your API key from: https://udioapi.pro/dashboard/api
+UDIO_API_KEY=your_udio_api_key_from_udioapi_pro_dashboard
+
+# SyncLock Analysis Server
+# Production server (recommended for live deployment)
+VITE_SYNCLOCK_SERVER_URL=http://13.50.242.251:8000
+# Local development server (uncomment for local testing)
+# VITE_SYNCLOCK_SERVER_URL=http://localhost:8000
 ```
 
 ### Installation
@@ -52,7 +62,7 @@ npm run build
 
 ### Professional Audio Processing
 - **Real-time analysis**: Extracts key, tempo, energy with 90%+ accuracy using enterprise audio analysis server
-- **Optimized performance**: Handles 50MB files, 5-minute duration limit
+- **Optimized performance**: Handles 50MB files, 2-minute duration limit
 - **Memory efficient**: Streaming processing prevents browser crashes
 - **Format support**: MP3, WAV, FLAC, M4A
 
@@ -80,7 +90,7 @@ npm run build
 ```
 
 ### Backend (Supabase Edge Functions Only)
-- **Edge Functions**: Replicate API integration and processing
+- **Edge Functions**: Udio API integration and processing
 - **No Database**: Stateless processing, no user data stored
 - **No Storage**: Client-side file handling only
 - **No Auth**: Anonymous usage, no user accounts
@@ -88,7 +98,7 @@ npm run build
 ### Audio Processing Pipeline
 - **Step 1**: Client-side audio file processing
 - **Step 2**: Audio file sent to Enterprise Audio Analysis Server for key and tempo detection
-- **Step 3**: Supabase Edge Function calls Replicate MusicGen API with detected key and tempo
+- **Step 3**: Supabase Edge Function calls Udio API with detected key and tempo
 - **Step 4**: Generated audio returned directly to client for download
 
 ### Enterprise Audio Analysis Server
@@ -99,8 +109,8 @@ npm run build
 
 ## 📊 API Integration
 
-### Replicate MusicGen (Primary)
-- **Model**: `meta/musicgen` with `melody` version
+### Udio API Pro (Primary)
+- **Model**: `https://udioapi.pro` with `melody` version
 - **Capability**: Audio-conditioned music generation
 - **Quality**: Enterprise-grade 32kHz output
 - **Features**: Preserves musical DNA while transforming style
@@ -114,7 +124,7 @@ npm run build
 
 ### Production Setup
 1. Configure environment variables
-2. Deploy Supabase edge functions for Replicate API integration
+2. Deploy Supabase edge functions for Udio API integration
 3. Configure CDN for static assets only
 4. Set up monitoring for edge function performance
 5. Set up Enterprise Audio Analysis Server:
@@ -163,7 +173,7 @@ The Enterprise Audio Analysis Server is a server-based audio analysis solution t
 ## 🎵 Audio Quality Specifications
 
 - **Input**: MP3, WAV, FLAC up to 50MB
-- **Duration**: 5 seconds to 5 minutes
+- **Duration**: 5 seconds to 2 minutes
 - **Output**: High-quality MP3 (320kbps equivalent)
 - **Processing**: Professional-grade audio algorithms
 - **Latency**: 2-3 minutes average generation time
