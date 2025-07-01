@@ -59,6 +59,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [targetStyle, setTargetStyle] = useState('Jazz Saxophone');
+  const [generationState, setGenerationState] = useState<{ predictionId: string, isGenerating: boolean, timeStarted: number } | null>(null);
+  const [showContinueButton, setShowContinueButton] = useState(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -129,6 +131,74 @@ export default function App() {
     console.log('✅ Analysis already completed during upload:', analysis);
   };
 
+  // 🔎 Polling function for async MusicGen Remixer completion
+  const pollForCompletion = async (predictionId: string, targetStyle: string) => {
+    const maxAttempts = 12; // 6 minutes max (30 seconds * 12)
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`🔎 Polling attempt ${attempt}/${maxAttempts} for prediction: ${predictionId}`);
+      setProgress(10 + (attempt * 7)); // Progress from 10 to 94
+      
+      try {
+        // Use Edge Function polling endpoint
+        const pollResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/virtuoso-ai-composer?predictionId=${predictionId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+            }
+          }
+        );
+        
+        if (!pollResponse.ok) {
+          console.warn(`⚠️ Polling failed: ${pollResponse.status}`);
+          await new Promise(resolve => setTimeout(resolve, 30000));
+          continue;
+        }
+        
+        const result = await pollResponse.json();
+        console.log(`📋 Poll result:`, { status: result.status, attempt });
+        
+        if (result.success && result.status === 'completed' && result.audioUrl) {
+          console.log('🎉 MusicGen Remixer completed!');
+          setGeneratedFile({
+            id: 'generated',
+            name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
+            url: result.audioUrl
+          });
+          setIsGenerating(false);
+          setProgress(100);
+          setState('completed');
+          setGenerationState(null);
+          return;
+        }
+        
+        if (result.status === 'failed') {
+          console.error('❌ Generation failed:', result.error);
+          throw new Error(result.error || 'Generation failed');
+        }
+        
+        // Still processing, wait and retry
+        console.log(`⏳ Still processing... waiting 30s (attempt ${attempt}/${maxAttempts})`);
+        if (attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 30000));
+        }
+        
+      } catch (error) {
+        console.error(`❌ Polling error on attempt ${attempt}:`, error);
+        if (attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 30000));
+        }
+      }
+    }
+    
+    // Timeout after all attempts
+    console.warn('⏰ Polling timeout - generation may still be processing');
+    throw new Error('Generation timed out. Please try again.');
+  };
+
   const handleGenerate = async () => {
     if (!analysis) return;
 
@@ -143,218 +213,265 @@ export default function App() {
     setError(null);
 
     try {
-      console.log('🎵 Starting music generation...');
-      setProgress(20);
+      console.log('🎵 Starting music generation with enhanced harmony analysis...');
+      
+      // Convert audio file to base64 for audio-to-audio generation
+      const audioResponse = await fetch(sourceFile.url);
+      const audioBlob = await audioResponse.blob();
+      const audioBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]); // Remove data:audio/... prefix
+        };
+        reader.readAsDataURL(audioBlob);
+      });
 
-      // Generate music prompt from analysis
-      const prompt = `Professional ${targetStyle} solo instrumental in ${analysis.key} major at ${analysis.tempo} BPM, ${analysis.energy > 0.6 ? 'high' : analysis.energy > 0.4 ? 'medium' : 'low'} energy, balanced, studio quality recording, no vocals`;
-      console.log('🎵 Generated prompt:', prompt);
-
-      // Call Supabase Edge Function with proper request
-      console.log('🚀 Calling Supabase Edge Function...');
-      setProgress(30);
-
-      // First attempt
-      let response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/virtuoso-ai-composer`, {
+      // Make the generation request
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/virtuoso-ai-composer`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt,
+          prompt: `Professional ${targetStyle} solo instrumental perfectly aligned to source track: ` +
+            `${analysis.key} ${analysis.mode || 'major'} at exactly ${analysis.tempo.toFixed(2)} BPM (${(analysis.bpmConfidence * 100).toFixed(0)}% confidence), ` +
+            `${analysis.energy > 0.7 ? 'high energy, dynamic' : 
+              analysis.energy > 0.5 ? 'medium energy, balanced' : 
+              'low energy, gentle'}, ${analysis.duration.toFixed(1)} seconds duration. ` +
+            `CHORD PROGRESSION: ${analysis.chordProgression?.map((chord, index) => {
+              const timing = `${chord.start_time.toFixed(1)}s-${chord.end_time.toFixed(1)}s`;
+              return `${chord.chord}(${timing})`;
+            }).slice(0, 5).join(', ') || 'Not available'}. ` +
+            `PHRASE STRUCTURE: ${analysis.phraseBoundaries?.map((boundary, index) => 
+              `${boundary.toFixed(1)}s`
+            ).slice(0, 4).join(', ') || 'Not available'}. ` +
+            `BEAT TIMING: ${analysis.beatPositions?.map((beat, index) => 
+              `${beat.toFixed(2)}s`
+            ).slice(0, 8).join(', ') || 'Not available'}. ` +
+            `${analysis.syncAccuracy ? `, ${(analysis.syncAccuracy * 100).toFixed(0)}% sync accuracy` : ''}. ` +
+            `Time signature: ${analysis.timeSignature}. ` +
+            `Maintain exact timing structure, complement original harmony, studio quality recording, no vocals. ` +
+            `Perfect rhythmic alignment with ${analysis.beatCount} beats. Harmonic integrity: ${(analysis.harmonicIntegrity * 100).toFixed(0)}%`,
           targetStyle,
           analysis: {
             tempo: analysis.tempo,
             key: analysis.key,
-            energy: analysis.energy
-          }
+            energy: analysis.energy,
+            mode: analysis.mode,
+            duration: analysis.duration
+          },
+          audioFile: `data:audio/mp3;base64,${audioBase64}`,
+          predictionId: generationState?.predictionId || null
         })
       });
 
-      if (!response.ok && response.status !== 202) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      const result = await response.text();
-      console.log('📦 Raw response:', result);
+      const data = await response.json();
+      console.log('🔄 Generation response:', data);
 
-      // Parse response - it might come as JSON string
-      let data;
-      try {
-        data = typeof result === 'string' ? JSON.parse(result) : result;
-      } catch (e) {
-        console.error('Failed to parse response:', e);
-        throw new Error('Invalid response format from server');
-      }
-
-      console.log('✅ Parsed response:', data);
-
-      // Handle generation in progress (status 202)
-      if (response.status === 202 && data.workId) {
-        console.log('⏳ Music generation in progress, retrying with workId:', data.workId);
-        setProgress(40);
+      // 🚀 NEW ASYNC PATTERN: Handle status:processing response
+      if (data.success && data.status === 'processing' && data.predictionId) {
+        console.log('⏳ MusicGen Remixer started, got prediction ID:', data.predictionId);
+        console.log('🕒 Estimated completion:', data.estimatedTime);
+        setProgress(10);
+        setGenerationState({ 
+          predictionId: data.predictionId, 
+          isGenerating: true,
+          timeStarted: Date.now()
+        });
         
-        // Wait and retry up to 6 times with the SAME workId (total ~4-5 minutes)
+        // Start polling for completion
+        await pollForCompletion(data.predictionId, targetStyle);
+        return;
+      }
+      
+      if (data.success && data.audioUrl) {
+        console.log('🎉 Music generated successfully!');
+        setGeneratedFile({
+          id: 'generated',
+          name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
+          url: data.audioUrl
+        });
+        setIsGenerating(false);
+        setProgress(100);
+        setState('completed');
+        return;
+      }
+
+      if (!data.success && data.predictionId) {
+        console.log('⏳ Generation in progress, polling for completion...');
+        setProgress(20);
+        setGenerationState({ 
+          predictionId: data.predictionId, 
+          isGenerating: true,
+          timeStarted: Date.now()
+        });
+        
+        // 🎯 REDUCED RETRIES: MusicGen-Style is much faster than original approach
         for (let retry = 1; retry <= 6; retry++) {
           console.log(`🔄 Retry attempt ${retry}/6 - waiting 30 seconds...`);
-          console.log(`⏰ Total time elapsed: ~${Math.round((75 + retry * 30) / 60)} minutes`);
-          setProgress(40 + (retry * 8)); // 40, 48, 56, 64, 72, 80
+          setProgress(40 + (retry * 5)); // 40, 45, 50, 55, 60, 65
+          console.log(`🎵 Generating harmonically compatible ${targetStyle}... (${retry}/6 attempts, ~${retry * 0.5} min elapsed)`);
           
-          // Wait 30 seconds before retry
           await new Promise(resolve => setTimeout(resolve, 30000));
           
-          try {
-            response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/virtuoso-ai-composer`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+          const retryResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/virtuoso-ai-composer`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              prompt: `Professional ${targetStyle} solo instrumental perfectly aligned to source track: ` +
+                `${analysis.key} ${analysis.mode || 'major'} at exactly ${analysis.tempo.toFixed(2)} BPM (${(analysis.bpmConfidence * 100).toFixed(0)}% confidence), ` +
+                `${analysis.energy > 0.7 ? 'high energy, dynamic' : 
+                  analysis.energy > 0.5 ? 'medium energy, balanced' : 
+                  'low energy, gentle'}, ${analysis.duration.toFixed(1)} seconds duration. ` +
+                `CHORD PROGRESSION: ${analysis.chordProgression?.map((chord, index) => {
+                  const timing = `${chord.start_time.toFixed(1)}s-${chord.end_time.toFixed(1)}s`;
+                  return `${chord.chord}(${timing})`;
+                }).slice(0, 5).join(', ') || 'Not available'}. ` +
+                `PHRASE STRUCTURE: ${analysis.phraseBoundaries?.map((boundary, index) => 
+                  `${boundary.toFixed(1)}s`
+                ).slice(0, 4).join(', ') || 'Not available'}. ` +
+                `BEAT TIMING: ${analysis.beatPositions?.map((beat, index) => 
+                  `${beat.toFixed(2)}s`
+                ).slice(0, 8).join(', ') || 'Not available'}. ` +
+                `${analysis.syncAccuracy ? `, ${(analysis.syncAccuracy * 100).toFixed(0)}% sync accuracy` : ''}. ` +
+                `Time signature: ${analysis.timeSignature}. ` +
+                `Maintain exact timing structure, complement original harmony, studio quality recording, no vocals. ` +
+                `Perfect rhythmic alignment with ${analysis.beatCount} beats. Harmonic integrity: ${(analysis.harmonicIntegrity * 100).toFixed(0)}%`,
+              targetStyle,
+              analysis: {
+                tempo: analysis.tempo,
+                key: analysis.key,
+                energy: analysis.energy,
+                mode: analysis.mode,
+                duration: analysis.duration
               },
-              body: JSON.stringify({
-                prompt,
-                targetStyle,
-                workId: data.workId, // 🔑 Pass the existing workId to check status
-                analysis: {
-                  tempo: analysis.tempo,
-                  key: analysis.key,
-                  energy: analysis.energy
-                }
-              })
+              audioFile: `data:audio/mp3;base64,${audioBase64}`,
+              predictionId: data.predictionId
+            })
+          });
+
+          const retryData = await retryResponse.json();
+          console.log(`🔄 Retry ${retry} response:`, retryData);
+
+          if (retryData.success && retryData.audioUrl) {
+            console.log('🎉 Music generation completed on retry!');
+            setGeneratedFile({
+              id: 'generated',
+              name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
+              url: retryData.audioUrl
             });
-
-            const retryResult = await response.text();
-            let retryData;
-            try {
-              retryData = typeof retryResult === 'string' ? JSON.parse(retryResult) : retryResult;
-            } catch (e) {
-              console.error('Failed to parse retry response:', e);
-              continue; // Try next retry
-            }
-
-            console.log(`🔄 Retry ${retry} response:`, retryData);
-
-            if (retryData.success && retryData.audioUrl) {
-              data = retryData;
-              break; // Success! Exit retry loop
-            }
-            
-            // Give user feedback about longer wait times
-            if (retry === 3) {
-              console.log('💭 Music generation is taking longer than usual, but this is normal for high-quality tracks...');
-            }
-            
-          } catch (retryError) {
-            console.error(`❌ Retry ${retry} failed:`, retryError);
-            if (retry === 6) {
-              throw new Error(`Music generation is taking longer than expected (${Math.round((75 + 6 * 30) / 60)} minutes). The track might still be generating. Please try again in a few minutes, or contact support if this persists.`);
-            }
+            setIsGenerating(false);
+            setProgress(100);
+            setState('completed');
+            setGenerationState(null);
+            return;
           }
         }
-      }
 
-      if (!data.success) {
+        // After all retries, show continue option
+        console.log('⏰ Max retries reached, offering manual continuation...');
+        setError(`⏰ Generation taking longer than expected. MusicGen-Style typically completes in 2-5 minutes.`);
+        setGenerationState({ 
+          predictionId: data.predictionId, 
+          isGenerating: false,
+          timeStarted: Date.now()
+        });
+        setIsGenerating(false);
+        setProgress(0);
+        setShowContinueButton(true);
+      } else {
         throw new Error(data.error || 'Generation failed');
       }
-
-      // Parse the audio URL - it might come directly as a string or nested in an object
-      const audioUrl = typeof data.audioUrl === 'string' 
-        ? data.audioUrl 
-        : data.audioUrl?.audio || data.audioUrl;
-
-      console.log('🎵 Generated audio URL:', audioUrl);
-      setProgress(80);
-
-      if (!audioUrl) {
-        throw new Error('No audio URL in the response');
-      }
-
-      setGeneratedFile({
-        id: 'generated',
-        name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
-        url: audioUrl
-        // No placeholder or mock waveform data - enterprise-grade real data only
-      });
-
-      setProgress(100);
-      setState('completed');
+    } catch (error) {
+      console.error('❌ Music generation failed:', error);
       setIsGenerating(false);
-
-    } catch (error: any) {
-      console.error('Generation error:', error);
-      const errorMessage = `❌ ${error.message || 'Music generation failed. Please try again.'}`;
-      console.log(errorMessage);
-      setError(errorMessage);
-      setState('analyzed');
-      setIsGenerating(false);
+      setError(`❌ Generation failed: ${error.message}`);
       setProgress(0);
+      setGenerationState(null);
     }
   };
 
-  const handleGenerateMusic = async () => {
-    if (!analysis || !sourceFile) {
-      setError('Please analyze audio first');
-      return;
-    }
-
+  const handleContinueGeneration = async () => {
+    if (!generationState?.predictionId || !analysis) return;
+    
+    setIsGenerating(true);
+    setShowContinueButton(false);
+    setError(null);
+    setProgress(20);
+    
     try {
-      console.log('🎯 Starting music generation...');
-      console.log('Analysis data being sent:', analysis);
-
-      const response = await fetch('/api/virtuoso-ai-composer', {
+      // Convert audio file to base64 for audio-to-audio generation
+      const audioResponse = await fetch(sourceFile!.url);
+      const audioBlob = await audioResponse.blob();
+      const audioBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]); // Remove data:audio/... prefix
+        };
+        reader.readAsDataURL(audioBlob);
+      });
+      
+      // Continue checking the existing generation
+      const targetStyle = mode === 'solo' ? INSTRUMENTS.find(i => i.id === instrument)?.name : 
+                        GROUPS.find(g => g.id === group)?.name;
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/virtuoso-ai-composer`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          analysis,
+          prompt: `Professional ${targetStyle} solo instrumental perfectly aligned to source track`,
           targetStyle,
-          generationConstraints: analysis.generationConstraints,
-          musicalDNA: analysis.musicalDNA,
-          symbolicData: analysis.symbolicData,
-          quantumTimeGrid: analysis.quantumTimeGrid
-        }),
+          analysis: {
+            tempo: analysis.tempo,
+            key: analysis.key,
+            energy: analysis.energy,
+            mode: analysis.mode,
+            duration: analysis.duration
+          },
+          audioFile: `data:audio/mp3;base64,${audioBase64}`,
+          predictionId: generationState.predictionId
+        })
       });
 
-      if (!response.ok) {
-        throw new Error(`Generation failed: ${response.status}`);
+      const data = await response.json();
+      
+      if (data.success && data.audioUrl) {
+        console.log('🎉 Generation completed successfully!');
+        setGeneratedFile({
+          id: 'generated',
+          name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
+          url: data.audioUrl
+        });
+        setIsGenerating(false);
+        setProgress(100);
+        setState('completed');
+        setGenerationState(null);
+      } else {
+        // Still not ready, show continue option again
+        setError('⏰ Generation still in progress. This can take up to 5 minutes for high-quality results.');
+        setIsGenerating(false);
+        setShowContinueButton(true);
+        setProgress(0);
       }
-
-      const data = await response.text();
-      console.log('Raw response:', data);
-
-      let parsedData;
-      try {
-        parsedData = typeof data === 'string' ? JSON.parse(data) : data;
-      } catch (parseError) {
-        console.error('JSON parse error:', parseError);
-        throw new Error('Invalid response format from generation service');
-      }
-
-      console.log('Parsed generation result:', parsedData);
-
-      if (!parsedData.success) {
-        throw new Error(parsedData.error || 'Generation failed');
-      }
-
-      // Parse the audio URL - it might come directly as a string or nested in an object
-      const audioUrl = typeof parsedData.audioUrl === 'string' 
-        ? parsedData.audioUrl 
-        : parsedData.audioUrl?.audio || parsedData.audioUrl;
-
-      console.log('🎵 Generated audio URL:', audioUrl);
-
-      setGeneratedFile({
-        id: 'generated',
-        name: `Virtuoso AI ${targetStyle} - ${new Date().toISOString().slice(0, 10)}.wav`,
-        url: audioUrl
-      });
-
     } catch (error) {
-      console.error('❌ Generation error:', error);
-      setError(error instanceof Error ? error.message : 'Generation failed');
+      console.error('❌ Continue generation failed:', error);
+      setError(`❌ Failed to check generation status: ${error.message}`);
+      setIsGenerating(false);
+      setShowContinueButton(true);
+      setProgress(0);
     }
   };
 
@@ -397,6 +514,14 @@ export default function App() {
         {error && (
           <div className="max-w-md mx-auto mb-8 p-4 bg-red-500/10 backdrop-blur-sm rounded-2xl border border-red-500/20">
             <p className="text-red-300 text-center">{error}</p>
+            {generationState && (
+              <button
+                onClick={handleContinueGeneration}
+                className="py-3 px-8 bg-white/10 border border-white/20 rounded-xl text-white font-semibold transition-all duration-300 hover:bg-white/20"
+              >
+                Continue Checking
+              </button>
+            )}
           </div>
         )}
 

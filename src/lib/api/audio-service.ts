@@ -199,8 +199,38 @@ export async function analyzeAudioFile(file: File): Promise<MusicAnalysis> {
     const data = await response.json();
     console.log('✅ SyncLock analysis completed:', data);
     
+    // 🔍 DETAILED SYNCLOCK DATA LOGGING
+    console.log('🎯 COMPLETE SyncLock Response:', {
+      analysis_duration: data.analysis_duration,
+      confidence_score: data.confidence_score,
+      sync_accuracy: data.sync_accuracy,
+      harmonic_integrity: data.harmonic_integrity,
+      rhythmic_stability: data.rhythmic_stability,
+      energy: data.energy,
+      duration: data.duration,
+      sample_rate: data.sample_rate
+    });
+    
     // Extract musical DNA from SyncLock response
     const musicalDNA = data.musical_dna;
+    
+    console.log('🎵 MUSICAL DNA DETAILS:', {
+      bpm: musicalDNA.bpm,
+      bpm_confidence: musicalDNA.bpm_confidence,
+      key: musicalDNA.key,
+      mode: musicalDNA.mode,
+      key_confidence: musicalDNA.key_confidence,
+      time_signature: musicalDNA.time_signature,
+      beat_positions_count: musicalDNA.beat_positions?.length || 0,
+      downbeat_positions_count: musicalDNA.downbeat_positions?.length || 0,
+      chord_progression_count: musicalDNA.chord_progression?.length || 0,
+      phrase_boundaries_count: musicalDNA.phrase_boundaries?.length || 0,
+      melodic_contour_count: musicalDNA.melodic_contour?.length || 0
+    });
+    
+    console.log('🎼 CHORD PROGRESSION:', musicalDNA.chord_progression?.slice(0, 5)?.map(chord => `${chord.chord} (${chord.start_time} - ${chord.end_time})`) || 'Not available');
+    console.log('📍 PHRASE BOUNDARIES:', musicalDNA.phrase_boundaries?.slice(0, 5) || 'Not available');
+    console.log('🥁 FIRST 5 BEAT POSITIONS:', musicalDNA.beat_positions?.slice(0, 5) || 'Not available');
     
     // Validate required server data - FAIL if not provided
     if (!musicalDNA) {
@@ -238,6 +268,14 @@ export async function analyzeAudioFile(file: File): Promise<MusicAnalysis> {
       phraseCount: musicalDNA.phrase_boundaries.length,
       syncAccuracy: data.sync_accuracy,
       harmonicIntegrity: data.harmonic_integrity,
+      
+      // 🎯 DETAILED TIMING DATA FOR PERFECT ALIGNMENT
+      chordProgression: musicalDNA.chord_progression?.slice(0, 8) || [], // First 8 chords with timing
+      phraseBoundaries: musicalDNA.phrase_boundaries?.slice(0, 6) || [], // First 6 phrase positions
+      beatPositions: musicalDNA.beat_positions?.slice(0, 16) || [], // First 16 beat positions
+      timeSignature: musicalDNA.time_signature || '4/4',
+      bpmConfidence: musicalDNA.bpm_confidence || 0,
+      keyConfidence: musicalDNA.key_confidence || 0,
       
       // Generation constraints
       generationConstraints: {
@@ -404,6 +442,14 @@ export async function analyzeAudio(audioUrl: string): Promise<MusicAnalysis> {
       phraseCount: musicalDNA.phrase_boundaries.length,
       syncAccuracy: data.sync_accuracy,
       harmonicIntegrity: data.harmonic_integrity,
+      
+      // 🎯 DETAILED TIMING DATA FOR PERFECT ALIGNMENT
+      chordProgression: musicalDNA.chord_progression?.slice(0, 8) || [], // First 8 chords with timing
+      phraseBoundaries: musicalDNA.phrase_boundaries?.slice(0, 6) || [], // First 6 phrase positions
+      beatPositions: musicalDNA.beat_positions?.slice(0, 16) || [], // First 16 beat positions
+      timeSignature: musicalDNA.time_signature || '4/4',
+      bpmConfidence: musicalDNA.bpm_confidence || 0,
+      keyConfidence: musicalDNA.key_confidence || 0,
       
       // Generation constraints from SyncLock server (100% real data)
       generationConstraints: {

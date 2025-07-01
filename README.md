@@ -2,6 +2,9 @@
 
 A production-ready web application that transforms your music into different styles using AI. Upload any song and generate new versions in jazz, soul, classical, or world music styles while preserving the original's musical DNA.
 
+- **Output**: High-quality MP3 (320kbps equivalent) (generate NEW instruments that don't exist in the original song, but are perfectly aligned and harmonically compatible when played together
+)
+
 ## 🎯 What It Does
 
 1. **Import & Analyze**: Upload your audio file (MP3, WAV, FLAC)
@@ -174,7 +177,8 @@ The Enterprise Audio Analysis Server is a server-based audio analysis solution t
 
 - **Input**: MP3, WAV, FLAC up to 50MB
 - **Duration**: 5 seconds to 2 minutes
-- **Output**: High-quality MP3 (320kbps equivalent)
+- **Output**: High-quality MP3 (320kbps equivalent) (generate NEW instruments that don't exist in the original song, but are perfectly aligned and harmonically compatible when played together
+)
 - **Processing**: Professional-grade audio algorithms
 - **Latency**: 2-3 minutes average generation time
 

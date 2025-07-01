@@ -21,6 +21,18 @@ export interface MusicAnalysis {
   syncAccuracy: number;  // 0-1 synchronization accuracy
   harmonicIntegrity: number; // 0-1 harmonic quality
   
+  // 🎯 DETAILED TIMING DATA FOR PERFECT ALIGNMENT
+  chordProgression: Array<{
+    chord: string;
+    start_time: number;
+    end_time: number;
+  }>;
+  phraseBoundaries: number[];  // Phrase start times in seconds
+  beatPositions: number[];     // Beat positions in seconds
+  timeSignature: string;       // e.g., "4/4"
+  bpmConfidence: number;       // 0-1 BPM detection confidence
+  keyConfidence: number;       // 0-1 key detection confidence
+  
   // Generation constraints
   generationConstraints: {
     chordLock: 'strict' | 'moderate' | 'flexible';
