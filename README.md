@@ -193,11 +193,3 @@ The Enterprise Audio Analysis Server is a server-based audio analysis solution t
 ## 📝 License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
-## 🎵 Demo
-
-Try it live: [virtuoso-ai.vercel.app](https://virtuoso-ai.vercel.app)
-
----
-
-**Built with ❤️ for musicians and music lovers**
